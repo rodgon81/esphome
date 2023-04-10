@@ -457,3 +457,16 @@ For the status led present on the meter, it must be configured with the followin
 Communication with the energy meters is through [UART](https://esphome.io/components/uart.html). The following image shows the internal ESP8266 module in the energy meter, and its connections.
 
 ![dxs238xw](img_readme/dxs238xw_uart.jpg)
+
+## Add External Component in ESPHome
+
+Since this component (`dxs238xw`) is not native to ESPHome, you must integrate it in the following way in the code editor.
+
+```yaml
+external_components:
+   - source:
+       type: git
+       url: https://github.com/rodgon81/esphome
+       ref: dev
+     components: [ dxs238xw ]
+```
