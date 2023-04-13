@@ -113,7 +113,7 @@ This development works only with the meters that work with the WISEN app on andr
         reset_data:
           name: "Restart Consumption"
       - platform: restart
-          name: "Restart Device"
+        name: "Restart Device"
 
     binary_sensor:
       - platform: gpio
@@ -441,9 +441,9 @@ For the button present on the meter, it must be configured with the following co
           invalid_cooldown: 0ms
 ```
 
-## External Status Led 
+# External Status Led 
 
-For the status led present on the meter, it must be configured with the following code.
+For the status led present on the meter, it must be configured with the following code. [Status Led](https://esphome.io/components/status_led)
 
 ```yaml
     status_led:
@@ -452,15 +452,15 @@ For the status led present on the meter, it must be configured with the followin
         inverted: no
 ```
 
-## UART Connection for update firmware
+# UART Connection for update firmware
 
 Communication with the energy meters is through [UART](https://esphome.io/components/uart.html). The following image shows the internal ESP8266 module in the energy meter, and its connections.
 
 ![dxs238xw](img_readme/dxs238xw_uart.jpg)
 
-## Add External Component in ESPHome
+# Add External Component in ESPHome
 
-Since this component (`dxs238xw`) is not native to ESPHome, you must integrate it in the following way in the code editor.
+Since this component (`dxs238xw`) is not native to ESPHome, you must integrate it in the following way in the code editor. [External Component](https://esphome.io/components/external_components)
 
 ```yaml
 external_components:
