@@ -495,50 +495,51 @@ bool Dxs238xwComponent::pre_transmit_serial_data_(uint8_t cmd, uint8_t frame_siz
 
 bool Dxs238xwComponent::receive_serial_data_(uint8_t *array, uint8_t size, uint8_t cmd, uint8_t type_message) {
   uint32_t response_time;
+  uint8_t index_size = 0;
 
   SmErrorCode read_error = SmErrorCode::NO_ERROR;
 
   response_time = millis() + SM_MAX_MILLIS_TO_RESPONSE;
 
-  while (available() < size) {
+  while (true) {
     if (response_time < millis()) {
-      if (available() > 0) {
+      if (index_size > 0) {
         read_error = SmErrorCode::NOT_ENOUGHT_BYTES;
       } else {
         read_error = SmErrorCode::TIMEOUT;
       }
 
       break;
+    } else {
+      if (available() > 0) {
+        array[index_size] = read();
+
+        if (index_size == 0 && array[0] != HEKR_HEADER) {
+          read_error = SmErrorCode::WRONG_BYTES;
+          break;
+        } else if (index_size == 2 && array[2] != type_message) {
+          read_error = SmErrorCode::WRONG_BYTES;
+          break;
+        } else if (index_size == 4 && array[4] != cmd) {
+          read_error = SmErrorCode::WRONG_BYTES;
+          break;
+        } else if (index_size > 4) {
+          if (index_size == array[1] - 1) {
+            ESP_LOGV(TAG, "* Message received: %s", format_hex_pretty(array, array[1]).c_str());
+
+            if (this->calculate_crc_(array, array[1]) != array[index_size]) {
+              read_error = SmErrorCode::CRC;
+            }
+
+            break;
+          }
+        }
+
+        index_size++;
+      }
     }
 
     yield();
-  }
-
-  delay(2);
-
-  if (read_error == SmErrorCode::NO_ERROR) {
-    if (available() == size) {
-      for (uint8_t n = 0; n < size; n++) {
-        array[n] = read();
-      }
-
-      ESP_LOGV(TAG, "* Message received: %s", format_hex_pretty(array, size).c_str());
-
-      if (array[0] == HEKR_HEADER && array[1] == size && array[2] == type_message && array[4] == cmd) {
-        if (this->calculate_crc_(array, size) != array[size - 1]) {
-          read_error = SmErrorCode::CRC;
-        }
-      } else {
-        read_error = SmErrorCode::WRONG_BYTES;
-      }
-    } else {
-      read_error = SmErrorCode::EXCEEDS_BYTES;
-    }
-  }
-
-  if (read_error != SmErrorCode::NO_ERROR) {
-    this->error_type_ = SmErrorType::COMMUNICATION;
-    this->error_code_ = read_error;
   }
 
   delay(2);
@@ -547,6 +548,11 @@ bool Dxs238xwComponent::receive_serial_data_(uint8_t *array, uint8_t size, uint8
     read();
 
     delay(2);
+  }
+
+  if (read_error != SmErrorCode::NO_ERROR) {
+    this->error_type_ = SmErrorType::COMMUNICATION;
+    this->error_code_ = read_error;
   }
 
   return (this->error_code_ == SmErrorCode::NO_ERROR);
@@ -606,8 +612,10 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
         this->ms_data_.warning_off_by_over_current = receive_array[15];
       }
 
-      if (!this->ms_data_.warning_off_by_end_purchase) {
-        this->ms_data_.warning_off_by_end_purchase = receive_array[19];
+      if (receive_array[1] == 21) {
+        if (!this->ms_data_.warning_off_by_end_purchase) {
+          this->ms_data_.warning_off_by_end_purchase = receive_array[19];
+        }
       }
 
       if (!this->ms_data_.warning_off_by_end_delay) {
@@ -627,7 +635,11 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
       UPDATE_BINARY_SENSOR(warning_off_by_over_voltage, this->ms_data_.warning_off_by_over_voltage)
       UPDATE_BINARY_SENSOR(warning_off_by_under_voltage, this->ms_data_.warning_off_by_under_voltage)
       UPDATE_BINARY_SENSOR(warning_off_by_over_current, this->ms_data_.warning_off_by_over_current)
-      UPDATE_BINARY_SENSOR(warning_off_by_end_purchase, this->ms_data_.warning_off_by_end_purchase)
+
+      if (receive_array[1] == 21) {
+        UPDATE_BINARY_SENSOR(warning_off_by_end_purchase, this->ms_data_.warning_off_by_end_purchase)
+      }
+
       UPDATE_BINARY_SENSOR(warning_off_by_end_delay, this->ms_data_.warning_off_by_end_delay)
       UPDATE_BINARY_SENSOR(warning_off_by_user, this->ms_data_.warning_off_by_user)
 
@@ -701,34 +713,38 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
       this->lp_data_.min_voltage_limit = (receive_array[7] << 8) | receive_array[8];
       this->lp_data_.max_current_limit = ((receive_array[9] << 8) | receive_array[10]) * 0.01;
 
-      this->lp_data_.energy_purchase_value =
-          (((receive_array[11] << 24) | (receive_array[12] << 16) | (receive_array[13] << 8) | receive_array[14]) *
-           0.01);
-      this->lp_data_.energy_purchase_balance =
-          (((receive_array[15] << 24) | (receive_array[16] << 16) | (receive_array[17] << 8) | receive_array[18]) *
-           0.01);
-      this->lp_data_.energy_purchase_alarm =
-          (((receive_array[19] << 24) | (receive_array[20] << 16) | (receive_array[21] << 8) | receive_array[22]) *
-           0.01);
+      if (receive_array[1] == 25) {
+        this->lp_data_.energy_purchase_value =
+            (((receive_array[11] << 24) | (receive_array[12] << 16) | (receive_array[13] << 8) | receive_array[14]) *
+             0.01);
+        this->lp_data_.energy_purchase_balance =
+            (((receive_array[15] << 24) | (receive_array[16] << 16) | (receive_array[17] << 8) | receive_array[18]) *
+             0.01);
+        this->lp_data_.energy_purchase_alarm =
+            (((receive_array[19] << 24) | (receive_array[20] << 16) | (receive_array[21] << 8) | receive_array[22]) *
+             0.01);
 
-      this->lp_data_.energy_purchase_state = receive_array[23];
+        this->lp_data_.energy_purchase_state = receive_array[23];
 
-      this->ms_data_.warning_purchase_alarm =
-          (this->lp_data_.energy_purchase_balance <= this->lp_data_.energy_purchase_alarm &&
-           this->lp_data_.energy_purchase_state);
+        this->ms_data_.warning_purchase_alarm =
+            (this->lp_data_.energy_purchase_balance <= this->lp_data_.energy_purchase_alarm &&
+             this->lp_data_.energy_purchase_state);
+      }
 
       ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-      UPDATE_SENSOR(energy_purchase_balance, this->lp_data_.energy_purchase_balance)
-      UPDATE_SENSOR(energy_purchase_price, this->lp_data_.energy_purchase_balance * this->ms_data_.price_kWh)
-
-      UPDATE_SWITCH(energy_purchase_state, this->lp_data_.energy_purchase_state)
-
-      UPDATE_BINARY_SENSOR(warning_purchase_alarm, this->ms_data_.warning_purchase_alarm)
-
-      UPDATE_NUMBER(max_current_limit, this->lp_data_.max_current_limit)
       UPDATE_NUMBER(max_voltage_limit, this->lp_data_.max_voltage_limit)
       UPDATE_NUMBER(min_voltage_limit, this->lp_data_.min_voltage_limit)
+      UPDATE_NUMBER(max_current_limit, this->lp_data_.max_current_limit)
+
+      if (receive_array[1] == 25) {
+        UPDATE_SENSOR(energy_purchase_balance, this->lp_data_.energy_purchase_balance)
+        UPDATE_SENSOR(energy_purchase_price, this->lp_data_.energy_purchase_balance * this->ms_data_.price_kWh)
+
+        UPDATE_SWITCH(energy_purchase_state, this->lp_data_.energy_purchase_state)
+
+        UPDATE_BINARY_SENSOR(warning_purchase_alarm, this->ms_data_.warning_purchase_alarm)
+      }
 
       break;
     }
@@ -1089,9 +1105,6 @@ void Dxs238xwComponent::print_error_() {
       break;
     case SmErrorCode::NOT_ENOUGHT_BYTES:
       string_code = SM_STR_CODE_NOT_ENOUGH_BYTES;
-      break;
-    case SmErrorCode::EXCEEDS_BYTES:
-      string_code = SM_STR_CODE_EXCEEDED_BYTES;
       break;
     case SmErrorCode::TIMEOUT:
       string_code = SM_STR_CODE_TIMED_OUT;

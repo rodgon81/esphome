@@ -106,7 +106,6 @@ static const char *const SM_STR_CODE_NO_ERROR = "No Errors";
 static const char *const SM_STR_CODE_CRC = "CRC check failed";
 static const char *const SM_STR_CODE_WRONG_BYTES = "The bytes was received but are not correct";
 static const char *const SM_STR_CODE_NOT_ENOUGH_BYTES = "Not enough bytes were received";
-static const char *const SM_STR_CODE_EXCEEDED_BYTES = "Expected amount of bytes exceeded";
 static const char *const SM_STR_CODE_TIMED_OUT = "Timed out";
 static const char *const SM_STR_CODE_WRONG_MSG = "Wrong Message";
 static const char *const SM_STR_CODE_MESSAGE_LENGTH = "Incorrect Message length";
@@ -165,7 +164,6 @@ enum class SmErrorCode : uint8_t {
   CRC,
   WRONG_BYTES,
   NOT_ENOUGHT_BYTES,
-  EXCEEDS_BYTES,
   TIMEOUT,
   WRONG_MSG,
   MESSAGE_LENGTH,
