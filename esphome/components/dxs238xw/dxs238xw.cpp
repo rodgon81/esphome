@@ -140,6 +140,7 @@ void Dxs238xwComponent::update() {
 
 void Dxs238xwComponent::dump_config() {
   LOG_UPDATE_INTERVAL(this)
+  ESP_LOGCONFIG(TAG, "*** COMPONENT VERSION: %s ***", SM_STR_COMPONENT_VERSION);
   ESP_LOGCONFIG(TAG, "* energy_purchase_value: %u", this->lp_data_.energy_purchase_value_tmp);
   ESP_LOGCONFIG(TAG, "* energy_purchase_Alarm: %u", this->lp_data_.energy_purchase_alarm_tmp);
   ESP_LOGCONFIG(TAG, "* delay_value_set: %u", this->ms_data_.delay_value_set);
@@ -515,12 +516,15 @@ bool Dxs238xwComponent::receive_serial_data_(uint8_t *array, uint8_t size, uint8
         array[index_size] = read();
 
         if (index_size == 0 && array[0] != HEKR_HEADER) {
+          ESP_LOGV(TAG, "* WRONG_BYTES: HEKR_HEADER");
           read_error = SmErrorCode::WRONG_BYTES;
           break;
         } else if (index_size == 2 && array[2] != type_message) {
+          ESP_LOGV(TAG, "* WRONG_BYTES: HEKR_TYPE_MESSAGE");
           read_error = SmErrorCode::WRONG_BYTES;
           break;
         } else if (index_size == 4 && array[4] != cmd) {
+          ESP_LOGV(TAG, "* WRONG_BYTES: HEKR_COMMAND");
           read_error = SmErrorCode::WRONG_BYTES;
           break;
         } else if (index_size > 4) {
