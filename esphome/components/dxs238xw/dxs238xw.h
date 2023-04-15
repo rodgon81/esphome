@@ -28,7 +28,7 @@
 namespace esphome {
 namespace dxs238xw {
 
-static const char *const SM_STR_COMPONENT_VERSION = "1.0.1000";
+static const char *const SM_STR_COMPONENT_VERSION = "1.0.2000";
 
 //------------------------------------------------------------------------------
 // DEFAULTS
@@ -50,18 +50,6 @@ static const uint8_t SM_MAX_HEX_MSG_LENGTH_PARSE = 176;
 
 // Header
 static const uint8_t HEKR_HEADER = 0x48;
-
-// Frame size
-static const uint8_t HEKR_SIZE_RECEIVE_METER_STATE = 0x15;
-static const uint8_t HEKR_SIZE_RECEIVE_MEASUREMENT = 0x43;
-static const uint8_t HEKR_SIZE_RECEIVE_LIMIT_AND_PURCHASE = 0x19;
-static const uint8_t HEKR_SIZE_RECEIVE_METER_ID = 0x0C;
-static const uint8_t HEKR_SIZE_SEND_LIMIT = 0x0C;
-static const uint8_t HEKR_SIZE_SEND_PURCHASE = 0x0F;
-static const uint8_t HEKR_SIZE_SEND_METER_STATE = 0x07;
-static const uint8_t HEKR_SIZE_SEND_DELAY = 0x09;
-static const uint8_t HEKR_SIZE_SEND_RESET = 0x06;
-static const uint8_t HEKR_SIZE_SEND_GET_DATA = 0x06;
 
 // Type message
 static const uint8_t HEKR_TYPE_RECEIVE = 0x01;
@@ -250,9 +238,7 @@ struct MeterStateData {
   binary_sensor::BinarySensor *name##_binary_sensor_; \
 \
  public: \
-  void set_##name##_binary_sensor(binary_sensor::BinarySensor *name##_binary_sensor) { \
-    this->name##_binary_sensor_ = name##_binary_sensor; \
-  }
+  void set_##name##_binary_sensor(binary_sensor::BinarySensor *name##_binary_sensor) { this->name##_binary_sensor_ = name##_binary_sensor; }
 #else
 #define DXS238XW_BINARY_SENSOR(name)
 #endif
@@ -263,9 +249,7 @@ struct MeterStateData {
   text_sensor::TextSensor *name##_text_sensor_; \
 \
  public: \
-  void set_##name##_text_sensor(text_sensor::TextSensor *name##_text_sensor) { \
-    this->name##_text_sensor_ = name##_text_sensor; \
-  }
+  void set_##name##_text_sensor(text_sensor::TextSensor *name##_text_sensor) { this->name##_text_sensor_ = name##_text_sensor; }
 #else
 #define DXS238XW_TEXT_SENSOR(name)
 #endif
@@ -395,9 +379,9 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   bool transmit_serial_data_(uint8_t *array, uint8_t size);
-  bool pre_transmit_serial_data_(uint8_t cmd, uint8_t frame_size, const uint8_t *array_data = nullptr);
-  bool receive_serial_data_(uint8_t *array, uint8_t size, uint8_t cmd, uint8_t type_message);
-  bool pre_receive_serial_data_(uint8_t cmd, uint8_t frame_size);
+  bool pre_transmit_serial_data_(uint8_t cmd, const uint8_t *array_data = nullptr, uint8_t array_size = 0);
+  bool receive_serial_data_(uint8_t *array, uint8_t type_message, uint8_t cmd = 0, uint8_t size_expected = 0);
+  bool pre_receive_serial_data_(uint8_t cmd = 0);
 
   void process_and_update_data_(const uint8_t *receive_array);
 
@@ -406,10 +390,9 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void update_meter_state_detail_();
   void set_delay_state_();
 
-  bool put_command_data_(uint8_t cmd_send, uint8_t cmd_receive, uint8_t frame_size_send, uint8_t frame_size_receive,
-                         uint8_t *array);
+  bool put_command_data_(uint8_t cmd_send, uint8_t cmd_receive, const uint8_t *array_data = nullptr, uint8_t array_size = 0);
 
-  bool incoming_messages_(bool print_error = true);
+  void incoming_messages_();
 
   std::string get_delay_value_remaining_string_(uint16_t value);
   std::string get_meter_state_string_(SmErrorMeterStateType error);
@@ -418,8 +401,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   void print_error_();
 
-  void load_initial_number_value_(ESPPreferenceObject &preference, const std::string &preference_name,
-                                  uint32_t *value_store);
+  void load_initial_number_value_(ESPPreferenceObject &preference, const std::string &preference_name, uint32_t *value_store);
   void save_initial_number_value_(ESPPreferenceObject &preference, const uint32_t *value);
 };
 
