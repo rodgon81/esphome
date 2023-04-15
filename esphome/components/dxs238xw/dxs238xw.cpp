@@ -745,37 +745,47 @@ bool Dxs238xwComponent::send_command_(SmCommandSend cmd, bool state) {
   switch (cmd) {
     case SmCommandSend::GET_POWER_STATE: {
       if ((millis() - this->ms_data_.time) >= SM_MIN_INTERVAL_TO_GET_DATA) {
+        ESP_LOGV(TAG, "In --- send_command - GET_POWER_STATE");
+
         is_good_result = this->put_command_data_(HEKR_CMD_SEND_GET_METER_STATE, HEKR_CMD_RECEIVE_METER_STATE);
 
-        ESP_LOGV(TAG, "In --- send_command - GET_POWER_STATE - Result = %s", TRUEFALSE(is_good_result));
+        ESP_LOGV(TAG, "Out --- send_command - GET_POWER_STATE - Result = %s", TRUEFALSE(is_good_result));
       }
 
       break;
     }
     case SmCommandSend::GET_MEASUREMENT_DATA: {
+      ESP_LOGV(TAG, "In --- send_command - GET_MEASUREMENT_DATA");
+
       is_good_result = this->put_command_data_(HEKR_CMD_SEND_GET_MEASUREMENT, HEKR_CMD_RECEIVE_MEASUREMENT);
 
-      ESP_LOGV(TAG, "In --- send_command - GET_MEASUREMENT_DATA - Result = %s", TRUEFALSE(is_good_result));
+      ESP_LOGV(TAG, "Out --- send_command - GET_MEASUREMENT_DATA - Result = %s", TRUEFALSE(is_good_result));
 
       break;
     }
     case SmCommandSend::GET_LIMIT_AND_PURCHASE_DATA: {
       if ((millis() - this->lp_data_.time) >= SM_MIN_INTERVAL_TO_GET_DATA) {
+        ESP_LOGV(TAG, "In --- send_command - GET_LIMIT_AND_PURCHASE_DATA");
+
         is_good_result = this->put_command_data_(HEKR_CMD_SEND_GET_LIMIT_AND_PURCHASE, HEKR_CMD_RECEIVE_LIMIT_AND_PURCHASE);
 
-        ESP_LOGV(TAG, "In --- send_command - GET_LIMIT_AND_PURCHASE_DATA - Result = %s", TRUEFALSE(is_good_result));
+        ESP_LOGV(TAG, "Out --- send_command - GET_LIMIT_AND_PURCHASE_DATA - Result = %s", TRUEFALSE(is_good_result));
       }
 
       break;
     }
     case SmCommandSend::GET_METER_ID: {
+      ESP_LOGV(TAG, "In --- send_command - GET_METER_ID");
+
       is_good_result = this->put_command_data_(HEKR_CMD_SEND_GET_METER_ID, HEKR_CMD_RECEIVE_METER_ID);
 
-      ESP_LOGV(TAG, "In --- send_command - GET_METER_ID - Result = %s", TRUEFALSE(is_good_result));
+      ESP_LOGV(TAG, "Out --- send_command - GET_METER_ID - Result = %s", TRUEFALSE(is_good_result));
 
       break;
     }
     case SmCommandSend::SET_LIMIT_DATA: {
+      ESP_LOGD(TAG, "In --- send_command - SET_LIMIT_DATA");
+
       uint16_t tmp_current_limit = this->lp_data_.max_current_limit * 100;
 
       uint8_t array_size = 6;
@@ -792,12 +802,14 @@ bool Dxs238xwComponent::send_command_(SmCommandSend cmd, bool state) {
 
       is_good_result = this->put_command_data_(HEKR_CMD_SEND_SET_LIMIT, HEKR_CMD_RECEIVE_LIMIT_AND_PURCHASE, array_data, array_size);
 
-      ESP_LOGD(TAG, "In --- send_command - SET_LIMIT_DATA - Result = %s", TRUEFALSE(is_good_result));
       ESP_LOGD(TAG, "* Input Data: max_current_limit = %u, max_voltage_limit = %u, min_voltage_limit = %u", this->lp_data_.max_current_limit, this->lp_data_.max_voltage_limit, this->lp_data_.min_voltage_limit);
+      ESP_LOGD(TAG, "Out --- send_command - SET_LIMIT_DATA - Result = %s", TRUEFALSE(is_good_result));
 
       break;
     }
     case SmCommandSend::SET_PURCHASE_DATA: {
+      ESP_LOGD(TAG, "In --- send_command - SET_PURCHASE_DATA");
+
       uint32_t purchase_value = 0;
       uint32_t purchase_alarm = 0;
 
@@ -823,12 +835,14 @@ bool Dxs238xwComponent::send_command_(SmCommandSend cmd, bool state) {
 
       is_good_result = this->put_command_data_(HEKR_CMD_SEND_SET_PURCHASE, HEKR_CMD_RECEIVE_LIMIT_AND_PURCHASE, array_data, array_size);
 
-      ESP_LOGD(TAG, "In --- send_command - SET_PURCHASE_DATA - Result = %s", TRUEFALSE(is_good_result));
       ESP_LOGD(TAG, "* Input Data: purchase_value = %u, purchase_alarm = %u, state = %s", (state ? this->lp_data_.energy_purchase_value_tmp : 0), (state ? this->lp_data_.energy_purchase_alarm_tmp : 0), ONOFF(state));
+      ESP_LOGD(TAG, "Out --- send_command - SET_PURCHASE_DATA - Result = %s", TRUEFALSE(is_good_result));
 
       break;
     }
     case SmCommandSend::SET_POWER_STATE: {
+      ESP_LOGD(TAG, "In --- send_command - SET_POWER_STATE");
+
       this->ms_data_.warning_off_by_user = !state;
 
       uint8_t array_size = 1;
@@ -838,16 +852,19 @@ bool Dxs238xwComponent::send_command_(SmCommandSend cmd, bool state) {
 
       is_good_result = this->put_command_data_(HEKR_CMD_SEND_SET_METER_STATE, HEKR_CMD_RECEIVE_METER_STATE, array_data, array_size);
 
-      ESP_LOGD(TAG, "In --- send_command - SET_POWER_STATE - Result = %s", TRUEFALSE(is_good_result));
       ESP_LOGD(TAG, "* Input Data: state = %s", ONOFF(state));
+      ESP_LOGD(TAG, "Out --- send_command - SET_POWER_STATE - Result = %s", TRUEFALSE(is_good_result));
 
       break;
     }
     case SmCommandSend::SET_DELAY: {
+      ESP_LOGD(TAG, "In --- send_command - SET_DELAY");
+
       uint16_t delay_value_set = 0;
 
-      if (state)
+      if (state) {
         delay_value_set = this->ms_data_.delay_value_set;
+      }
 
       uint8_t array_size = 3;
       uint8_t array_data[array_size];
@@ -859,15 +876,17 @@ bool Dxs238xwComponent::send_command_(SmCommandSend cmd, bool state) {
 
       is_good_result = this->put_command_data_(HEKR_CMD_SEND_SET_DELAY, HEKR_CMD_RECEIVE_METER_STATE, array_data, array_size);
 
-      ESP_LOGD(TAG, "In --- send_command - SET_DELAY - Result = %s", TRUEFALSE(is_good_result));
       ESP_LOGD(TAG, "* Input Data: delay_value_set = %u, state = %s", delay_value_set, ONOFF(state));
+      ESP_LOGD(TAG, "Out --- send_command - SET_DELAY - Result = %s", TRUEFALSE(is_good_result));
 
       break;
     }
     case SmCommandSend::SET_RESET: {
+      ESP_LOGD(TAG, "In --- send_command - SET_RESET");
+
       is_good_result = this->put_command_data_(HEKR_CMD_SEND_SET_RESET, HEKR_CMD_RECEIVE_MEASUREMENT);
 
-      ESP_LOGD(TAG, "In --- send_command - SET_RESET - Result = %s", TRUEFALSE(is_good_result));
+      ESP_LOGD(TAG, "Out --- send_command - SET_RESET - Result = %s", TRUEFALSE(is_good_result));
 
       break;
     }

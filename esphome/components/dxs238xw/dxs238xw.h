@@ -28,7 +28,7 @@
 namespace esphome {
 namespace dxs238xw {
 
-static const char *const SM_STR_COMPONENT_VERSION = "1.0.2000";
+static const char *const SM_STR_COMPONENT_VERSION = "1.0.2001";
 
 //------------------------------------------------------------------------------
 // DEFAULTS
@@ -93,10 +93,13 @@ static const char *const SM_STR_TYPE_INPUT_DATA = "Input data";
 
 // Error Description
 static const char *const SM_STR_CODE_NO_ERROR = "No Errors";
-static const char *const SM_STR_CODE_CRC = "CRC check failed";
+
 static const char *const SM_STR_CODE_WRONG_BYTES = "The bytes was received but are not correct";
+static const char *const SM_STR_CODE_CRC = "CRC check failed";
+
 static const char *const SM_STR_CODE_NOT_ENOUGH_BYTES = "Not enough bytes were received";
 static const char *const SM_STR_CODE_TIMED_OUT = "Timed out";
+
 static const char *const SM_STR_CODE_WRONG_MSG = "Wrong Message";
 static const char *const SM_STR_CODE_MESSAGE_LENGTH = "Incorrect Message length";
 
