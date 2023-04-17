@@ -43,6 +43,7 @@ async def to_code(config):
         trigger = cg.new_Pvariable(config[CONF_TRIGGER_ID], var)
         await automation.build_automation(trigger, [], config)
 
+
 ACTION_SCHEMA = automation.maybe_simple_id(
     {
         cv.GenerateID(): cv.use_id(Wall01fanComponent),
@@ -57,8 +58,7 @@ CONDITION_SCHEMA = cv.All(
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-RemoteReceiverAction = wall01fan_ns.class_(
-    "RemoteReceiverAction", automation.Action)
+RemoteReceiverAction = wall01fan_ns.class_("RemoteReceiverAction", automation.Action)
 
 
 @automation.register_action(
@@ -95,6 +95,7 @@ async def turn_on_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
 
+
 # ---------------------------------------------------------------------------------------------------
 
 PowerTurnOffAction = wall01fan_ns.class_("PowerTurnOffAction", automation.Action)
@@ -104,6 +105,7 @@ PowerTurnOffAction = wall01fan_ns.class_("PowerTurnOffAction", automation.Action
 async def power_turn_off_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
+
 
 # ---------------------------------------------------------------------------------------------------
 
@@ -118,15 +120,14 @@ async def power_toggle_action_to_code(config, action_id, template_arg, args):
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-OscillationTurnOnAction = wall01fan_ns.class_(
-    "OscillationTurnOnAction", automation.Action
-)
+OscillationTurnOnAction = wall01fan_ns.class_("OscillationTurnOnAction", automation.Action)
 
 
 @automation.register_action("wall01fan.oscillation_turn_on", OscillationTurnOnAction, ACTION_SCHEMA)
 async def oscillation_turn_on_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
+
 
 # ---------------------------------------------------------------------------------------------------
 
@@ -139,6 +140,7 @@ OscillationTurnOffAction = wall01fan_ns.class_(
 async def oscillation_turn_off_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
+
 
 # ---------------------------------------------------------------------------------------------------
 
@@ -163,6 +165,7 @@ async def speed_none_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
 
+
 # ---------------------------------------------------------------------------------------------------
 
 SpeedLowAction = wall01fan_ns.class_("SpeedLowAction", automation.Action)
@@ -172,6 +175,7 @@ SpeedLowAction = wall01fan_ns.class_("SpeedLowAction", automation.Action)
 async def speed_low_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
+
 
 # ---------------------------------------------------------------------------------------------------
 
@@ -183,6 +187,7 @@ async def speed_mid_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
 
+
 # ---------------------------------------------------------------------------------------------------
 
 SpeedHighAction = wall01fan_ns.class_("SpeedHighAction", automation.Action)
@@ -192,6 +197,7 @@ SpeedHighAction = wall01fan_ns.class_("SpeedHighAction", automation.Action)
 async def speed_high_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
+
 
 # ---------------------------------------------------------------------------------------------------
 
@@ -214,6 +220,7 @@ async def mode_none_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
 
+
 # ---------------------------------------------------------------------------------------------------
 
 ModeNormalAction = wall01fan_ns.class_("ModeNormalAction", automation.Action)
@@ -223,6 +230,7 @@ ModeNormalAction = wall01fan_ns.class_("ModeNormalAction", automation.Action)
 async def mode_normal_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
+
 
 # ---------------------------------------------------------------------------------------------------
 
@@ -234,6 +242,7 @@ async def mode_natural_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
 
+
 # ---------------------------------------------------------------------------------------------------
 
 ModeSleepAction = wall01fan_ns.class_("ModeSleepAction", automation.Action)
@@ -243,6 +252,7 @@ ModeSleepAction = wall01fan_ns.class_("ModeSleepAction", automation.Action)
 async def mode_sleep_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
+
 
 # ---------------------------------------------------------------------------------------------------
 
@@ -258,7 +268,8 @@ async def mode_toggle_action_to_code(config, action_id, template_arg, args):
 # ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 IsPowerOnCondition = wall01fan_ns.class_(
-    "IsPowerOnCondition", automation.Condition)
+    "IsPowerOnCondition", automation.Condition
+)
 
 
 @automation.register_condition("wall01fan.is_power_on", IsPowerOnCondition, CONDITION_SCHEMA)
@@ -266,10 +277,12 @@ async def is_power_on_condition_to_code(config, condition_id, template_arg, args
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(condition_id, template_arg, paren)
 
+
 # ---------------------------------------------------------------------------------------------------
 
 IsTemperatureModeCondition = wall01fan_ns.class_(
-    "IsTemperatureModeCondition", automation.Condition)
+    "IsTemperatureModeCondition", automation.Condition
+)
 
 
 @automation.register_condition("wall01fan.is_temperature_mode", IsTemperatureModeCondition, CONDITION_SCHEMA)

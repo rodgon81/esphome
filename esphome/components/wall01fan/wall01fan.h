@@ -239,7 +239,7 @@ class Wall01fanComponent : public Component {
   void dump_config() override;
 
   void remote_receiver(uint8_t protocol, uint64_t code);
-  void set_switch_value(SmIdEntity entity, bool value);
+  void set_switch_value(SmIdEntity entity, bool state);
 
   void power_turn_on();
   void power_turn_off();
