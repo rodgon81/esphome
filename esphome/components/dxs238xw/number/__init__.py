@@ -150,7 +150,9 @@ TYPES = {
         number.NUMBER_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(Dxs238xwNumber),
-                cv.Optional(CONF_ICON, default="mdi:home-lightning-bolt-outline"): cv.icon,
+                cv.Optional(
+                    CONF_ICON, default="mdi:home-lightning-bolt-outline"
+                ): cv.icon,
                 cv.Optional(
                     CONF_UNIT_OF_MEASUREMENT, default=UNIT_KILOWATT_HOURS
                 ): cv.string_strict,

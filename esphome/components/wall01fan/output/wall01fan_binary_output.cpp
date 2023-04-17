@@ -10,14 +10,14 @@ static const char *const TAG = "wall01fan.binary_output";
 void Wall01fanBinaryOutput::set_pin(InternalGPIOPin *pin) { pin_ = pin; }
 
 void Wall01fanBinaryOutput::setup() {
-    this->pin_->setup();
-    this->turn_off();
+  this->pin_->setup();
+  this->turn_off();
 }
 
 void Wall01fanBinaryOutput::dump_config() {
-    ESP_LOGCONFIG(TAG, "Binary Output:");
-    LOG_PIN("  Pin: ", this->pin_);
-    LOG_BINARY_OUTPUT(this);
+  ESP_LOGCONFIG(TAG, "Binary Output:");
+  LOG_PIN("  Pin: ", this->pin_);
+  LOG_BINARY_OUTPUT(this);
 }
 
 void Wall01fanBinaryOutput::write_state(bool state) { this->pin_->digital_write(state); }

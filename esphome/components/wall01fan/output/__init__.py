@@ -24,7 +24,8 @@ CONF_COLUMN_I = "column_i"
 CONF_COLUMN_J = "column_j"
 
 Wall01fanBinaryOutput = wall01fan_ns.class_(
-    "Wall01fanBinaryOutput", output.BinaryOutput, cg.Component)
+    "Wall01fanBinaryOutput", output.BinaryOutput, cg.Component
+)
 
 TYPES = {
     CONF_OSCILLATION: output.BINARY_OUTPUT_SCHEMA.extend(
@@ -63,7 +64,6 @@ TYPES = {
             cv.Required(CONF_PIN): pins.internal_gpio_output_pin_schema,
         }
     ),
-
     CONF_COLUMN_C: output.BINARY_OUTPUT_SCHEMA.extend(
         {
             cv.GenerateID(): cv.declare_id(Wall01fanBinaryOutput),

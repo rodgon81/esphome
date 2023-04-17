@@ -7,19 +7,19 @@ namespace esphome {
 namespace wall01fan {
 
 class Wall01fanBinaryOutput : public output::BinaryOutput, public Component {
-   public:
-    void set_pin(InternalGPIOPin *pin);
+ public:
+  void set_pin(InternalGPIOPin *pin);
 
-    void setup() override;
+  void setup() override;
 
-    void dump_config() override;
+  void dump_config() override;
 
-    float get_setup_priority() const override;
+  float get_setup_priority() const override;
 
-   protected:
-    void write_state(bool state) override;
+ protected:
+  void write_state(bool state) override;
 
-    InternalGPIOPin *pin_;
+  InternalGPIOPin *pin_;
 };
 
 }  // namespace wall01fan

@@ -44,7 +44,8 @@ CONF_ROW_4 = "row_4"
 CONF_ROW_5 = "row_5"
 
 Wall01fanBinaryInputOutput = wall01fan_ns.class_(
-    "Wall01fanBinaryInputOutput", cg.Component)
+    "Wall01fanBinaryInputOutput", cg.Component
+)
 
 TYPES = {
     CONF_ROW_1: GPIO_IO_SCHEMA.extend(
@@ -187,9 +188,7 @@ async def to_code(config):
             cg.add(getattr(paren, f"set_{type}_binary_input_output")(var))
             pin = await cg.gpio_pin_expression(conf[CONF_PIN])
             cg.add(var.set_pin(pin))
-            cg.add(var.set_mode_input(
-                pins.gpio_flags_expr(conf[CONF_MODE_INPUT])))
-            cg.add(var.set_mode_output(
-                pins.gpio_flags_expr(conf[CONF_MODE_OUTPUT])))
+            cg.add(var.set_mode_input(pins.gpio_flags_expr(conf[CONF_MODE_INPUT])))
+            cg.add(var.set_mode_output(pins.gpio_flags_expr(conf[CONF_MODE_OUTPUT])))
 
             cg.add_define("USE_BINARY_INPUT_OUTPUT")

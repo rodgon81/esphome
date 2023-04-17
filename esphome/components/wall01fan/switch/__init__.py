@@ -4,6 +4,7 @@ import esphome.codegen as cg
 
 from esphome.const import (
     ENTITY_CATEGORY_CONFIG,
+    CONF_POWER,
 )
 
 from .. import wall01fan_ns, SmIdEntity, CONF_WALL01FAN_ID, WALL01FAN_COMPONENT_SCHEMA
@@ -12,7 +13,6 @@ DEPENDENCIES = ["wall01fan"]
 
 Wall01fanSwitch = wall01fan_ns.class_("Wall01fanSwitch", switch.Switch)
 
-CONF_POWER = "power"
 CONF_OSCILLATION = "oscillation"
 CONF_SPEED_LOW = "speed_low"
 CONF_SPEED_MID = "speed_mid"
