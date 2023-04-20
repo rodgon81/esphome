@@ -162,22 +162,22 @@ TYPES = {
         state_class=STATE_CLASS_MEASUREMENT,
     ),
     CONF_POWER_FACTOR_TOTAL: sensor.sensor_schema(
-        accuracy_decimals=3,
+        accuracy_decimals=2,
         device_class=DEVICE_CLASS_POWER_FACTOR,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
     CONF_POWER_FACTOR_PHASE_1: sensor.sensor_schema(
-        accuracy_decimals=3,
+        accuracy_decimals=2,
         device_class=DEVICE_CLASS_POWER_FACTOR,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
     CONF_POWER_FACTOR_PHASE_2: sensor.sensor_schema(
-        accuracy_decimals=3,
+        accuracy_decimals=2,
         device_class=DEVICE_CLASS_POWER_FACTOR,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
     CONF_POWER_FACTOR_PHASE_3: sensor.sensor_schema(
-        accuracy_decimals=3,
+        accuracy_decimals=2,
         device_class=DEVICE_CLASS_POWER_FACTOR,
         state_class=STATE_CLASS_MEASUREMENT,
     ),

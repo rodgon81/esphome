@@ -54,6 +54,7 @@ TYPES = {
         ),
         SmLimitValue.MIN_CURRENT,
         SmLimitValue.MAX_CURRENT,
+        SmLimitValue.STEP_CURRENT,
         SmIdEntity.NUMBER_MAX_CURRENT_LIMIT,
     ),
     MAX_VOLTAGE_LIMIT: (
@@ -72,6 +73,7 @@ TYPES = {
         ),
         SmLimitValue.MIN_VOLTAGE,
         SmLimitValue.MAX_VOLTAGE,
+        SmLimitValue.STEP_VOLTAGE,
         SmIdEntity.NUMBER_MAX_VOLTAGE_LIMIT,
     ),
     MIN_VOLTAGE_LIMIT: (
@@ -90,6 +92,7 @@ TYPES = {
         ),
         SmLimitValue.MIN_VOLTAGE,
         SmLimitValue.MAX_VOLTAGE,
+        SmLimitValue.STEP_VOLTAGE,
         SmIdEntity.NUMBER_MIN_VOLTAGE_LIMIT,
     ),
     ENERGY_PURCHASE_VALUE: (
@@ -108,6 +111,7 @@ TYPES = {
         ),
         SmLimitValue.MIN_ENERGY_PURCHASE_VALUE,
         SmLimitValue.MAX_ENERGY_PURCHASE_VALUE,
+        SmLimitValue.STEP_ENERGY_PURCHASE_VALUE,
         SmIdEntity.NUMBER_ENERGY_PURCHASE_VALUE,
     ),
     ENERGY_PURCHASE_ALARM: (
@@ -126,6 +130,7 @@ TYPES = {
         ),
         SmLimitValue.MIN_ENERGY_PURCHASE_ALARM,
         SmLimitValue.MAX_ENERGY_PURCHASE_ALARM,
+        SmLimitValue.STEP_ENERGY_PURCHASE_ALARM,
         SmIdEntity.NUMBER_ENERGY_PURCHASE_ALARM,
     ),
     DELAY_VALUE_SET: (
@@ -144,6 +149,7 @@ TYPES = {
         ),
         SmLimitValue.MIN_DELAY_SET,
         SmLimitValue.MAX_DELAY_SET,
+        SmLimitValue.STEP_DELAY_SET,
         SmIdEntity.NUMBER_DELAY_VALUE_SET,
     ),
     STARTING_KWH: (
@@ -164,6 +170,7 @@ TYPES = {
         ),
         SmLimitValue.MIN_STARTING_KWH,
         SmLimitValue.MAX_STARTING_KWH,
+        SmLimitValue.STEP_STARTING_KWH,
         SmIdEntity.NUMBER_STARTING_KWH,
     ),
     PRICE_KWH: (
@@ -182,23 +189,24 @@ TYPES = {
         ),
         SmLimitValue.MIN_PRICE_KWH,
         SmLimitValue.MAX_PRICE_KWH,
+        SmLimitValue.STEP_PRICE_KWH,
         SmIdEntity.NUMBER_PRICE_KWH,
     ),
 }
 
 CONFIG_SCHEMA = DXS238XW_COMPONENT_SCHEMA.extend(
-    {cv.Optional(type): schema for type, (schema, _, _, _) in TYPES.items()}
+    {cv.Optional(type): schema for type, (schema, _, _, _, _) in TYPES.items()}
 )
 
 
 async def to_code(config):
     paren = await cg.get_variable(config[CONF_DXS238XW_ID])
 
-    for type, (_, min, max, number_id) in TYPES.items():
+    for type, (_, min, max, step_value, number_id) in TYPES.items():
         if type in config:
             conf = config[type]
             var = await number.new_number(
-                conf, min_value=min, max_value=max, step=conf[CONF_STEP]
+                conf, min_value=min, max_value=max, step=step_value
             )
             cg.add(var.set_dxs238xw_parent(paren))
             cg.add(var.set_entity_id(number_id))

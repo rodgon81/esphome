@@ -165,18 +165,25 @@ enum class SmErrorCode : uint8_t {
 enum SmLimitValue : uint32_t {
   MIN_VOLTAGE = 80,                    // V
   MAX_VOLTAGE = 300,                   // V
+  STEP_VOLTAGE = 1,                    // Unit
   MIN_CURRENT = 1,                     // A
   MAX_CURRENT = 60,                    // A
+  STEP_CURRENT = 1,                    // Unit
   MIN_DELAY_SET = 0,                   // minutes
   MAX_DELAY_SET = 1440,                // minutes
+  STEP_DELAY_SET = 1,                  // Unit
   MIN_ENERGY_PURCHASE_ALARM = 0,       // kWh
   MAX_ENERGY_PURCHASE_ALARM = 999999,  // kWh
+  STEP_ENERGY_PURCHASE_ALARM = 1,      // Unit
   MIN_ENERGY_PURCHASE_VALUE = 0,       // kWh
   MAX_ENERGY_PURCHASE_VALUE = 999999,  // kWh
+  STEP_ENERGY_PURCHASE_VALUE = 1,      // Unit
   MIN_STARTING_KWH = 0,                // kWh
   MAX_STARTING_KWH = 999999,           // kWh
+  STEP_STARTING_KWH = 1,               // Unit
   MIN_PRICE_KWH = 0,                   // $
   MAX_PRICE_KWH = 999999,              // $
+  STEP_PRICE_KWH = 1,                  // Unit
 };
 
 struct LimitAndPurchaseData {
