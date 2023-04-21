@@ -242,31 +242,16 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
           if (this->transmit_serial_data_(send_array, length_array)) {
             ESP_LOGD(TAG, "* Waiting answer:");
 
-            uint32_t response_time = millis() + SM_MAX_MILLIS_TO_RESPONSE;
+            uint8_t receive_array[SM_MAX_BYTE_MSG_BUFFER];
 
-            while (available() == 0) {
-              if (response_time < millis()) {
-                this->error_type_ = SmErrorType::COMMUNICATION;
-                this->error_code_ = SmErrorCode::TIMEOUT;
+            if (this->receive_serial_data_(receive_array, HEKR_TYPE_RECEIVE)) {
+              ESP_LOGD(TAG, "* Successful answer: %s", format_hex_pretty(receive_array, receive_array[1]).c_str());
 
-                break;
-              }
+              this->process_and_update_data_(receive_array);
 
-              yield();
-            }
+              ESP_LOGD(TAG, "Out --- send_hex_message");
 
-            if (this->error_code_ == SmErrorCode::NO_ERROR) {
-              uint8_t receive_array[SM_MAX_BYTE_MSG_BUFFER];
-
-              if (this->receive_serial_data_(receive_array, HEKR_TYPE_RECEIVE)) {
-                ESP_LOGD(TAG, "* Successful answer: %s", format_hex_pretty(receive_array, receive_array[1]).c_str());
-
-                this->process_and_update_data_(receive_array);
-
-                ESP_LOGD(TAG, "Out --- send_hex_message");
-
-                return;
-              }
+              return;
             }
 
             ESP_LOGD(TAG, "* Failed answer");
@@ -623,6 +608,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
       if (!this->ms_data_.warning_off_by_end_delay) {
         this->ms_data_.warning_off_by_end_delay = (this->ms_data_.delay_value_remaining == 0 && this->ms_data_.delay_state);
       }
+
       this->set_delay_state_();
 
       /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -696,6 +682,12 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
       this->lp_data_.min_voltage_limit = (receive_array[7] << 8) | receive_array[8];
       this->lp_data_.max_current_limit = ((receive_array[9] << 8) | receive_array[10]) * 0.01;
 
+      UPDATE_NUMBER(max_voltage_limit, this->lp_data_.max_voltage_limit)
+      UPDATE_NUMBER(min_voltage_limit, this->lp_data_.min_voltage_limit)
+      UPDATE_NUMBER(max_current_limit, this->lp_data_.max_current_limit)
+
+      ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
       if (receive_array[1] == 25) {
         this->lp_data_.energy_purchase_value = (((receive_array[11] << 24) | (receive_array[12] << 16) | (receive_array[13] << 8) | receive_array[14]) * 0.01);
         this->lp_data_.energy_purchase_balance = (((receive_array[15] << 24) | (receive_array[16] << 16) | (receive_array[17] << 8) | receive_array[18]) * 0.01);
@@ -704,15 +696,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
         this->lp_data_.energy_purchase_state = receive_array[23];
 
         this->ms_data_.warning_purchase_alarm = (this->lp_data_.energy_purchase_balance <= this->lp_data_.energy_purchase_alarm && this->lp_data_.energy_purchase_state);
-      }
 
-      ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-      UPDATE_NUMBER(max_voltage_limit, this->lp_data_.max_voltage_limit)
-      UPDATE_NUMBER(min_voltage_limit, this->lp_data_.min_voltage_limit)
-      UPDATE_NUMBER(max_current_limit, this->lp_data_.max_current_limit)
-
-      if (receive_array[1] == 25) {
         UPDATE_SENSOR(energy_purchase_balance, this->lp_data_.energy_purchase_balance)
         UPDATE_SENSOR(energy_purchase_price, this->lp_data_.energy_purchase_balance * this->ms_data_.price_kWh)
 
@@ -726,8 +710,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
     case HEKR_CMD_RECEIVE_METER_ID: {
       char serial_number[20];
 
-      sprintf(serial_number, "%u%u%u %u%u%u", receive_array[5], receive_array[6], receive_array[7], receive_array[8], receive_array[9], receive_array[10]);
-
+      sprintf(serial_number, "%02u%02u%02u %02u%02u%02u", receive_array[5], receive_array[6], receive_array[7], receive_array[8], receive_array[9], receive_array[10]);
       std::string string_serial_number(serial_number);
 
       ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -931,17 +914,63 @@ void Dxs238xwComponent::update_meter_state_detail_() {
 void Dxs238xwComponent::set_delay_state_() {
   if (this->ms_data_.warning_off_by_end_delay) {
     if (this->ms_data_.meter_state) {
-      uint8_t send_array_size_meter_state_off = 7;
-      uint8_t send_array_meter_state_off[send_array_size_meter_state_off] = {0x48, 0x07, 0x02, 0x01, 0x09, 0x00, 0x5B};
+      ESP_LOGD(TAG, "In --- set_delay_state_ - Firt Step");
 
-      this->transmit_serial_data_(send_array_meter_state_off, send_array_size_meter_state_off);
+      uint8_t send_array_size_meter_state_off = 7;
+      uint8_t send_array_meter_state_off[send_array_size_meter_state_off] = {HEKR_HEADER, send_array_size_meter_state_off, HEKR_TYPE_SEND, 0x01, HEKR_CMD_SEND_SET_METER_STATE, 0x00, 0x5B};
+
+      ESP_LOGD(TAG, "* Delay timed out, trying to disable state relay - off");
+
+      if (this->transmit_serial_data_(send_array_meter_state_off, send_array_size_meter_state_off)) {
+        ESP_LOGD(TAG, "* Waiting answer:");
+
+        uint8_t receive_array[SM_MAX_BYTE_MSG_BUFFER];
+
+        if (this->receive_serial_data_(receive_array, HEKR_TYPE_RECEIVE)) {
+          ESP_LOGD(TAG, "* Successful answer: %s", format_hex_pretty(receive_array, receive_array[1]).c_str());
+
+          ESP_LOGD(TAG, "Out --- set_delay_state_ - Firt Step");
+
+          return;
+        }
+      }
+
+      ESP_LOGD(TAG, "* Failed answer");
+
+      this->print_error_();
+
+      ESP_LOGD(TAG, "Out -- set_delay_state_ - Firt Step");
+
+      return;
     }
 
     if (this->ms_data_.delay_state && !this->ms_data_.meter_state) {
-      uint8_t send_array_size_delay_off = 9;
-      uint8_t send_array_delay_off[send_array_size_delay_off] = {0x48, 0x09, 0x02, 0x01, 0x0C, 0x00, 0x00, 0x00, 0x60};
+      ESP_LOGD(TAG, "In --- set_delay_state_ - Second Step");
 
-      this->transmit_serial_data_(send_array_delay_off, send_array_size_delay_off);
+      uint8_t send_array_size_delay_off = 9;
+      uint8_t send_array_delay_off[send_array_size_delay_off] = {HEKR_HEADER, send_array_size_delay_off, HEKR_TYPE_SEND, 0x01, HEKR_CMD_SEND_SET_DELAY, 0x00, 0x00, 0x00, 0x60};
+
+      ESP_LOGD(TAG, "* Delay timed out, trying to disable state delay - off");
+
+      if (this->transmit_serial_data_(send_array_delay_off, send_array_size_delay_off)) {
+        ESP_LOGD(TAG, "* Waiting answer:");
+
+        uint8_t receive_array[SM_MAX_BYTE_MSG_BUFFER];
+
+        if (this->receive_serial_data_(receive_array, HEKR_TYPE_RECEIVE)) {
+          ESP_LOGD(TAG, "* Successful answer: %s", format_hex_pretty(receive_array, receive_array[1]).c_str());
+
+          ESP_LOGD(TAG, "Out --- set_delay_state_ - Second Step");
+
+          return;
+        }
+      }
+
+      ESP_LOGD(TAG, "* Failed answer");
+
+      this->print_error_();
+
+      ESP_LOGD(TAG, "Out -- set_delay_state_ - Second Step");
     }
   }
 }
