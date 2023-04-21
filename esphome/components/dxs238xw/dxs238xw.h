@@ -28,7 +28,7 @@
 namespace esphome {
 namespace dxs238xw {
 
-static const char *const SM_STR_COMPONENT_VERSION = "1.0.3000";
+static const char *const SM_STR_COMPONENT_VERSION = "1.0.4000";
 
 //------------------------------------------------------------------------------
 // DEFAULTS
@@ -88,7 +88,8 @@ static const char *const SM_STR_POWER_STATE_DETAILS_UNKNOWN = "Off by Unknown";
 
 // Error Type
 static const char *const SM_STR_TYPE_NO_ERROR = "No error type";
-static const char *const SM_STR_TYPE_COMUNICATION = "Communication";
+static const char *const SM_STR_TYPE_COMMUNICATION_CONFIRMATION = "Communication (Confirmation Message)";
+static const char *const SM_STR_TYPE_COMMUNICATION_ANSWER = "Communication (Answer Message)";
 static const char *const SM_STR_TYPE_INPUT_DATA = "Input data";
 
 // Error Description
@@ -148,7 +149,8 @@ enum class SmCommandSend : uint8_t {
 
 enum class SmErrorType : uint8_t {
   NO_ERROR,
-  COMMUNICATION,
+  COMMUNICATION_CONFIRMATION,
+  COMMUNICATION_ANSWER,
   INPUT_DATA,
 };
 
@@ -386,6 +388,8 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   SmErrorType error_type_ = SmErrorType::NO_ERROR;
   SmErrorCode error_code_ = SmErrorCode::NO_ERROR;
 
+  uint8_t receive_array[SM_MAX_BYTE_MSG_BUFFER];
+
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   bool transmit_serial_data_(uint8_t *array, uint8_t size);
@@ -395,12 +399,11 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   void process_and_update_data_(const uint8_t *receive_array);
 
-  bool send_command_(SmCommandSend cmd, bool state = false);
+  bool send_command_(SmCommandSend cmd, bool state = false, bool process_data = true);
 
   void update_meter_state_detail_();
-  void set_delay_state_();
 
-  bool put_command_data_(uint8_t cmd_send, uint8_t cmd_receive, const uint8_t *array_data = nullptr, uint8_t array_size = 0);
+  bool put_command_data_(uint8_t cmd_send, uint8_t cmd_receive, const uint8_t *array_data = nullptr, uint8_t array_size = 0, bool process_data = true);
 
   void incoming_messages_();
 
