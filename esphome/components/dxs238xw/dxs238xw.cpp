@@ -87,44 +87,53 @@ static const char *const TAG = "dxs238xw";
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 
-float Dxs238xwComponent::get_setup_priority() const { return setup_priority::AFTER_CONNECTION; }
+float Dxs238xwComponent::get_setup_priority() const { return setup_priority::LATE; }
 
 void Dxs238xwComponent::setup() {
-  ESP_LOGI(TAG, "* Load Preferences Values");
-  this->load_initial_number_value_(this->preference_delay_value_set_, "delay_value_set", &this->ms_data_.delay_value_set);
-  this->load_initial_number_value_(this->preference_starting_kWh_, "starting_kWh", &this->ms_data_.starting_kWh);
-  this->load_initial_number_value_(this->preference_price_kWh_, "price_kWh", &this->ms_data_.price_kWh);
-  this->load_initial_number_value_(this->preference_energy_purchase_value_, "energy_purchase_value", &this->lp_data_.energy_purchase_value_tmp);
-  this->load_initial_number_value_(this->preference_energy_purchase_alarm_, "energy_purchase_alarm", &this->lp_data_.energy_purchase_alarm_tmp);
+  if (this->postpone_setup_time_ == 0) {
+    this->postpone_setup_time_ = millis() + SM_POSTPONE_SETUP_TIME;
+  }
 
-  UPDATE_NUMBER(delay_value_set, this->ms_data_.delay_value_set)
-  UPDATE_NUMBER(starting_kWh, this->ms_data_.starting_kWh)
-  UPDATE_NUMBER(price_kWh, this->ms_data_.price_kWh)
-  UPDATE_NUMBER(energy_purchase_value, this->lp_data_.energy_purchase_value_tmp)
-  UPDATE_NUMBER(energy_purchase_alarm, this->lp_data_.energy_purchase_alarm_tmp)
+  if (postpone_setup_time_ > millis()) {
+    this->component_state_ &= ~COMPONENT_STATE_MASK;
+    this->component_state_ |= COMPONENT_STATE_CONSTRUCTION;
+  } else {
+    ESP_LOGI(TAG, "In --- setup");
 
-  ESP_LOGI(TAG, "* Load GET_METER_ID");
-  this->send_command_(SmCommandSend::GET_METER_ID);
+    ESP_LOGI(TAG, "* Load Preferences Values");
+    this->load_initial_number_value_(this->preference_delay_value_set_, this->hash_delay_value_set_, &this->ms_data_.delay_value_set);
+    this->load_initial_number_value_(this->preference_starting_kWh_, this->hash_starting_kWh_, &this->ms_data_.starting_kWh);
+    this->load_initial_number_value_(this->preference_price_kWh_, this->hash_price_kWh_, &this->ms_data_.price_kWh);
+    this->load_initial_number_value_(this->preference_energy_purchase_value_, this->hash_energy_purchase_value_, &this->lp_data_.energy_purchase_value_tmp);
+    this->load_initial_number_value_(this->preference_energy_purchase_alarm_, this->hash_energy_purchase_alarm_, &this->lp_data_.energy_purchase_alarm_tmp);
 
-  ESP_LOGI(TAG, "* Load GET_POWER_STATE");
-  this->send_command_(SmCommandSend::GET_POWER_STATE);
+    UPDATE_NUMBER(delay_value_set, this->ms_data_.delay_value_set)
+    UPDATE_NUMBER(starting_kWh, this->ms_data_.starting_kWh)
+    UPDATE_NUMBER(price_kWh, this->ms_data_.price_kWh)
+    UPDATE_NUMBER(energy_purchase_value, this->lp_data_.energy_purchase_value_tmp)
+    UPDATE_NUMBER(energy_purchase_alarm, this->lp_data_.energy_purchase_alarm_tmp)
 
-  ESP_LOGI(TAG, "* Load GET_LIMIT_AND_PURCHASE_DATA");
-  this->send_command_(SmCommandSend::GET_LIMIT_AND_PURCHASE_DATA);
+    ESP_LOGI(TAG, "* Load GET_METER_ID");
+    this->send_command_(SmCommandSend::GET_METER_ID);
 
-  ESP_LOGI(TAG, "* Load GET_MEASUREMENT_DATA");
-  this->send_command_(SmCommandSend::GET_MEASUREMENT_DATA);
+    ESP_LOGI(TAG, "* Load GET_POWER_STATE");
+    this->send_command_(SmCommandSend::GET_POWER_STATE);
 
-  this->status_momentary_warning("wait_to_loop_and_update", SM_WAIT_TO_LOOP_AND_UPDATE_STATE);
+    ESP_LOGI(TAG, "* Load GET_LIMIT_AND_PURCHASE_DATA");
+    this->send_command_(SmCommandSend::GET_LIMIT_AND_PURCHASE_DATA);
+
+    ESP_LOGI(TAG, "* Load GET_MEASUREMENT_DATA");
+    this->send_command_(SmCommandSend::GET_MEASUREMENT_DATA);
+
+    ESP_LOGI(TAG, "Out --- setup");
+  }
 }
 
 void Dxs238xwComponent::loop() {
-  if (this->get_component_state() == COMPONENT_STATE_LOOP) {
-    this->incoming_messages_();
+  this->incoming_messages_();
 
-    this->send_command_(SmCommandSend::GET_POWER_STATE);
-    this->send_command_(SmCommandSend::GET_LIMIT_AND_PURCHASE_DATA);
-  }
+  this->send_command_(SmCommandSend::GET_POWER_STATE);
+  this->send_command_(SmCommandSend::GET_LIMIT_AND_PURCHASE_DATA);
 }
 
 void Dxs238xwComponent::update() {
@@ -147,20 +156,14 @@ void Dxs238xwComponent::dump_config() {
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 
-void Dxs238xwComponent::meter_state_toggle() {
-  bool state = !this->ms_data_.meter_state;
+void Dxs238xwComponent::meter_state_toggle() { this->set_meter_state_(!this->ms_data_.meter_state); }
 
-  this->send_command_(SmCommandSend::SET_POWER_STATE, state);
-}
+void Dxs238xwComponent::meter_state_on() { this->set_meter_state_(true); }
 
-void Dxs238xwComponent::meter_state_on() {
-  bool state = true;
+void Dxs238xwComponent::meter_state_off() { this->set_meter_state_(false); }
 
-  this->send_command_(SmCommandSend::SET_POWER_STATE, state);
-}
-
-void Dxs238xwComponent::meter_state_off() {
-  bool state = false;
+void Dxs238xwComponent::set_meter_state_(bool state) {
+  this->ms_data_.warning_off_by_user = !state;
 
   this->send_command_(SmCommandSend::SET_POWER_STATE, state);
 }
@@ -242,10 +245,10 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
           if (this->transmit_serial_data_(send_array, length_array)) {
             ESP_LOGD(TAG, "* Waiting answer:");
 
-            if (this->receive_serial_data_(this->receive_array, HEKR_TYPE_RECEIVE)) {
-              ESP_LOGD(TAG, "* Successful answer: %s", format_hex_pretty(this->receive_array, this->receive_array[1]).c_str());
+            if (this->receive_serial_data_(this->receive_array_, HEKR_TYPE_RECEIVE)) {
+              ESP_LOGD(TAG, "* Successful answer: %s", format_hex_pretty(this->receive_array_, this->receive_array_[1]).c_str());
 
-              this->process_and_update_data_(this->receive_array);
+              this->process_and_update_data_(this->receive_array_);
 
               ESP_LOGD(TAG, "Out --- send_hex_message");
 
@@ -278,6 +281,8 @@ void Dxs238xwComponent::set_switch_value(SmIdEntity entity, bool value) {
         break;
       }
       case SmIdEntity::SWITCH_METER_STATE: {
+        this->ms_data_.warning_off_by_user = !value;
+
         tmp_cmd_send = SmCommandSend::SET_POWER_STATE;
         break;
       }
@@ -537,6 +542,10 @@ bool Dxs238xwComponent::receive_serial_data_(uint8_t *array, uint8_t type_messag
   }
 
   if (read_error != SmErrorCode::NO_ERROR) {
+    if (read_error == SmErrorCode::WRONG_BYTES || read_error == SmErrorCode::CRC) {
+      ESP_LOGD(TAG, "* Message with error received: %s", format_hex_pretty(array, array[1]).c_str());
+    }
+
     if (type_message == HEKR_TYPE_SEND) {
       this->error_type_ = SmErrorType::COMMUNICATION_CONFIRMATION;
     } else {
@@ -552,7 +561,7 @@ bool Dxs238xwComponent::receive_serial_data_(uint8_t *array, uint8_t type_messag
 bool Dxs238xwComponent::pre_receive_serial_data_(uint8_t cmd) {
   ESP_LOGV(TAG, "* Waiting answer:");
 
-  if (this->receive_serial_data_(this->receive_array, HEKR_TYPE_RECEIVE, cmd)) {
+  if (this->receive_serial_data_(this->receive_array_, HEKR_TYPE_RECEIVE, cmd)) {
     ESP_LOGV(TAG, "* Successful answer");
 
     return true;
@@ -611,7 +620,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
           this->ms_data_.meter_state = receive_array[6];
         }
 
-        ESP_LOGD(TAG, "* New Power State = %s", TRUEFALSE(this->ms_data_.meter_state));
+        ESP_LOGD(TAG, "* New Power State = %s", ONOFF(this->ms_data_.meter_state));
       }
 
       if (this->ms_data_.warning_off_by_end_delay && this->ms_data_.delay_state) {
@@ -621,7 +630,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
           this->ms_data_.delay_state = receive_array[18];
         }
 
-        ESP_LOGD(TAG, "* New Delay State = %s", TRUEFALSE(this->ms_data_.delay_state));
+        ESP_LOGD(TAG, "* New Delay State = %s", ONOFF(this->ms_data_.delay_state));
       }
 
       /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -832,8 +841,6 @@ bool Dxs238xwComponent::send_command_(SmCommandSend cmd, bool state, bool proces
     case SmCommandSend::SET_POWER_STATE: {
       ESP_LOGD(TAG, "In --- send_command - SET_POWER_STATE");
 
-      this->ms_data_.warning_off_by_user = !state;
-
       uint8_t array_size = 1;
       uint8_t array_data[array_size];
 
@@ -894,16 +901,16 @@ void Dxs238xwComponent::update_meter_state_detail_() {
   if (this->ms_data_.meter_state) {
     tmp_meter_state_detail = SmErrorMeterStateType::POWER_OK;
   } else {
-    if (this->ms_data_.warning_off_by_end_delay) {
-      tmp_meter_state_detail = SmErrorMeterStateType::END_DELAY;
-    } else if (this->ms_data_.warning_off_by_end_purchase) {
-      tmp_meter_state_detail = SmErrorMeterStateType::END_PURCHASE;
+    if (this->ms_data_.warning_off_by_over_current) {
+      tmp_meter_state_detail = SmErrorMeterStateType::OVER_CURRENT;
     } else if (this->ms_data_.warning_off_by_over_voltage) {
       tmp_meter_state_detail = SmErrorMeterStateType::OVER_VOLTAGE;
     } else if (this->ms_data_.warning_off_by_under_voltage) {
       tmp_meter_state_detail = SmErrorMeterStateType::UNDER_VOLTAGE;
-    } else if (this->ms_data_.warning_off_by_over_current) {
-      tmp_meter_state_detail = SmErrorMeterStateType::OVER_CURRENT;
+    } else if (this->ms_data_.warning_off_by_end_delay) {
+      tmp_meter_state_detail = SmErrorMeterStateType::END_DELAY;
+    } else if (this->ms_data_.warning_off_by_end_purchase) {
+      tmp_meter_state_detail = SmErrorMeterStateType::END_PURCHASE;
     } else if (this->ms_data_.warning_off_by_user) {
       tmp_meter_state_detail = SmErrorMeterStateType::END_BY_USER;
     }
@@ -924,7 +931,7 @@ bool Dxs238xwComponent::put_command_data_(uint8_t cmd_send, uint8_t cmd_receive,
   if (this->pre_transmit_serial_data_(cmd_send, array_data, array_size)) {
     if (this->pre_receive_serial_data_(cmd_receive)) {
       if (process_data) {
-        this->process_and_update_data_(this->receive_array);
+        this->process_and_update_data_(this->receive_array_);
       }
 
       return true;
@@ -943,10 +950,10 @@ void Dxs238xwComponent::incoming_messages_() {
 
   ESP_LOGI(TAG, "Incoming message");
 
-  if (this->receive_serial_data_(this->receive_array, HEKR_TYPE_RECEIVE)) {
-    ESP_LOGI(TAG, "* Successful message arrived: %s", format_hex_pretty(this->receive_array, this->receive_array[1]).c_str());
+  if (this->receive_serial_data_(this->receive_array_, HEKR_TYPE_RECEIVE)) {
+    ESP_LOGI(TAG, "* Successful message arrived: %s", format_hex_pretty(this->receive_array_, this->receive_array_[1]).c_str());
 
-    this->process_and_update_data_(this->receive_array);
+    this->process_and_update_data_(this->receive_array_);
 
     return;
   }
@@ -1058,18 +1065,18 @@ void Dxs238xwComponent::print_error_() {
   this->error_code_ = SmErrorCode::NO_ERROR;
 }
 
-void Dxs238xwComponent::load_initial_number_value_(ESPPreferenceObject &preference, const std::string &preference_name, uint32_t *value_store) {
-  preference = global_preferences->make_preference<uint32_t>(fnv1_hash(preference_name));
+void Dxs238xwComponent::load_initial_number_value_(ESPPreferenceObject &preference, uint32_t preference_name, uint32_t *value_store) {
+  preference = global_preferences->make_preference<uint32_t>(preference_name);
 
   uint32_t initial_state;
 
   if (!preference.load(&initial_state)) {
-    ESP_LOGE(TAG, "* Error load store number: %s, return default value: %u", preference_name.c_str(), *value_store);
+    ESP_LOGE(TAG, "* Error load store number: %u, return default value: %u", preference_name, *value_store);
 
     this->save_initial_number_value_(preference, value_store);
   }
 
-  ESP_LOGD(TAG, "* Load store number: %s, Return value: %u", preference_name.c_str(), initial_state);
+  ESP_LOGD(TAG, "* Load store number: %u, Return value: %u", preference_name, initial_state);
 
   *value_store = initial_state;
 }

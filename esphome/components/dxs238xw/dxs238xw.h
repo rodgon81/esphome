@@ -1,41 +1,26 @@
 #pragma once
 
 #include "esphome/components/uart/uart.h"
-#include "esphome/core/component.h"
-#include "esphome/core/defines.h"
-#include "esphome/core/helpers.h"
-#include "esphome/core/preferences.h"
-
-#ifdef USE_BINARY_SENSOR
-#include "esphome/components/binary_sensor/binary_sensor.h"
-#endif
-#ifdef USE_BUTTON
-#include "esphome/components/button/button.h"
-#endif
-#ifdef USE_NUMBER
-#include "esphome/components/number/number.h"
-#endif
-#ifdef USE_SENSOR
-#include "esphome/components/sensor/sensor.h"
-#endif
-#ifdef USE_SWITCH
-#include "esphome/components/switch/switch.h"
-#endif
-#ifdef USE_TEXT_SENSOR
-#include "esphome/components/text_sensor/text_sensor.h"
-#endif
+#include "esphome/core/application.h"
 
 namespace esphome {
 namespace dxs238xw {
 
-static const char *const SM_STR_COMPONENT_VERSION = "1.0.4000";
+static const char *const SM_STR_COMPONENT_VERSION = "1.0.5000";
 
 //------------------------------------------------------------------------------
 // DEFAULTS
 //------------------------------------------------------------------------------
 
 static const uint16_t SM_MIN_INTERVAL_TO_GET_DATA = 500;
-static const uint16_t SM_WAIT_TO_LOOP_AND_UPDATE_STATE = 2500;
+
+#ifdef USE_API
+static const uint16_t SM_POSTPONE_SETUP_TIME = 5000;
+#endif
+
+#ifdef USE_MQTT
+static const uint16_t SM_POSTPONE_SETUP_TIME = 2500;
+#endif
 
 static const uint16_t SM_MAX_MILLIS_TO_CONFIRM = 200;
 static const uint16_t SM_MAX_MILLIS_TO_RESPONSE = 1000;
@@ -379,6 +364,12 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   LimitAndPurchaseData lp_data_;
   MeterStateData ms_data_;
 
+  uint32_t hash_delay_value_set_ = fnv1_hash("delay_value_set");
+  uint32_t hash_starting_kWh_ = fnv1_hash("starting_kWh");
+  uint32_t hash_price_kWh_ = fnv1_hash("price_kWh");
+  uint32_t hash_energy_purchase_value_ = fnv1_hash("energy_purchase_value");
+  uint32_t hash_energy_purchase_alarm_ = fnv1_hash("energy_purchase_alarm");
+
   ESPPreferenceObject preference_energy_purchase_value_;
   ESPPreferenceObject preference_energy_purchase_alarm_;
   ESPPreferenceObject preference_delay_value_set_;
@@ -388,9 +379,13 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   SmErrorType error_type_ = SmErrorType::NO_ERROR;
   SmErrorCode error_code_ = SmErrorCode::NO_ERROR;
 
-  uint8_t receive_array[SM_MAX_BYTE_MSG_BUFFER];
+  uint8_t receive_array_[SM_MAX_BYTE_MSG_BUFFER];
+
+  uint32_t postpone_setup_time_ = 0;
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  void set_meter_state_(bool state);
 
   bool transmit_serial_data_(uint8_t *array, uint8_t size);
   bool pre_transmit_serial_data_(uint8_t cmd, const uint8_t *array_data = nullptr, uint8_t array_size = 0);
@@ -414,7 +409,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   void print_error_();
 
-  void load_initial_number_value_(ESPPreferenceObject &preference, const std::string &preference_name, uint32_t *value_store);
+  void load_initial_number_value_(ESPPreferenceObject &preference, uint32_t preference_name, uint32_t *value_store);
   void save_initial_number_value_(ESPPreferenceObject &preference, const uint32_t *value);
 };
 
