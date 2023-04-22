@@ -15,7 +15,7 @@ static const char *const SM_STR_COMPONENT_VERSION = "1.0.5000";
 static const uint16_t SM_MIN_INTERVAL_TO_GET_DATA = 500;
 
 #ifdef USE_API
-static const uint16_t SM_POSTPONE_SETUP_TIME = 5000;
+static const uint16_t SM_POSTPONE_SETUP_TIME = 10000;
 #endif
 
 #ifdef USE_MQTT
