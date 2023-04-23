@@ -6,7 +6,7 @@
 namespace esphome {
 namespace dxs238xw {
 
-static const char *const SM_STR_COMPONENT_VERSION = "1.0.5000";
+static const char *const SM_STR_COMPONENT_VERSION = "1.0.6000";
 
 //------------------------------------------------------------------------------
 // DEFAULTS
@@ -16,9 +16,7 @@ static const uint16_t SM_MIN_INTERVAL_TO_GET_DATA = 500;
 
 #ifdef USE_API
 static const uint16_t SM_POSTPONE_SETUP_TIME = 10000;
-#endif
-
-#ifdef USE_MQTT
+#else
 static const uint16_t SM_POSTPONE_SETUP_TIME = 2500;
 #endif
 
@@ -80,7 +78,11 @@ static const char *const SM_STR_TYPE_INPUT_DATA = "Input data";
 // Error Description
 static const char *const SM_STR_CODE_NO_ERROR = "No Errors";
 
-static const char *const SM_STR_CODE_WRONG_BYTES = "The bytes was received but are not correct";
+static const char *const SM_STR_CODE_WRONG_BYTES_HEADER = "The bytes was received but are not correct (HEADER)";
+static const char *const SM_STR_CODE_WRONG_BYTES_LENGTH = "The bytes was received but are not correct (LENGTH)";
+static const char *const SM_STR_CODE_WRONG_BYTES_TYPE_MESSAGE = "The bytes was received but are not correct (TYPE_MESSAGE)";
+static const char *const SM_STR_CODE_WRONG_BYTES_COMMAND = "The bytes was received but are not correct (COMMAND)";
+
 static const char *const SM_STR_CODE_CRC = "CRC check failed";
 
 static const char *const SM_STR_CODE_NOT_ENOUGH_BYTES = "Not enough bytes were received";
@@ -88,6 +90,13 @@ static const char *const SM_STR_CODE_TIMED_OUT = "Timed out";
 
 static const char *const SM_STR_CODE_WRONG_MSG = "Wrong Message";
 static const char *const SM_STR_CODE_MESSAGE_LENGTH = "Incorrect Message length";
+
+// Preference Name
+static const char *const SM_STR_DELAY_VALUE_SET = "delay_value_set";
+static const char *const SM_STR_STARTING_KWH = "starting_kWh";
+static const char *const SM_STR_PRICE_KWH = "price_kWh";
+static const char *const SM_STR_ENERGY_PURCHASE_VALUE = "energy_purchase_value";
+static const char *const SM_STR_ENERGY_PURCHASE_ALARM = "energy_purchase_alarm";
 
 enum class SmErrorMeterStateType : uint8_t {
   POWER_OK,
@@ -142,7 +151,10 @@ enum class SmErrorType : uint8_t {
 enum class SmErrorCode : uint8_t {
   NO_ERROR,
   CRC,
-  WRONG_BYTES,
+  WRONG_BYTES_HEADER,
+  WRONG_BYTES_LENGTH,
+  WRONG_BYTES_TYPE_MESSAGE,
+  WRONG_BYTES_COMMAND,
   NOT_ENOUGHT_BYTES,
   TIMEOUT,
   WRONG_MSG,
@@ -177,9 +189,9 @@ struct LimitAndPurchaseData {
   uint32_t time = 0;
 
   float energy_purchase_value = 0;
-  uint32_t energy_purchase_value_tmp = SmLimitValue::MIN_ENERGY_PURCHASE_VALUE;
+  uint32_t energy_purchase_value_tmp = 0;
   float energy_purchase_alarm = 0;
-  uint32_t energy_purchase_alarm_tmp = SmLimitValue::MIN_ENERGY_PURCHASE_ALARM;
+  uint32_t energy_purchase_alarm_tmp = 0;
 
   float energy_purchase_balance = 0;
 
@@ -215,7 +227,7 @@ struct MeterStateData {
   SmErrorMeterStateType meter_state_detail = SmErrorMeterStateType::UNKNOWN;
 
   uint16_t delay_value_remaining = 0;
-  uint32_t delay_value_set = SmLimitValue::MAX_DELAY_SET;
+  uint32_t delay_value_set = 0;
 };
 
 #ifdef USE_SENSOR
@@ -364,17 +376,17 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   LimitAndPurchaseData lp_data_;
   MeterStateData ms_data_;
 
-  uint32_t hash_delay_value_set_ = fnv1_hash("delay_value_set");
-  uint32_t hash_starting_kWh_ = fnv1_hash("starting_kWh");
-  uint32_t hash_price_kWh_ = fnv1_hash("price_kWh");
-  uint32_t hash_energy_purchase_value_ = fnv1_hash("energy_purchase_value");
-  uint32_t hash_energy_purchase_alarm_ = fnv1_hash("energy_purchase_alarm");
+  uint32_t hash_delay_value_set_ = fnv1_hash(SM_STR_DELAY_VALUE_SET);
+  uint32_t hash_starting_kWh_ = fnv1_hash(SM_STR_STARTING_KWH);
+  uint32_t hash_price_kWh_ = fnv1_hash(SM_STR_PRICE_KWH);
+  uint32_t hash_energy_purchase_value_ = fnv1_hash(SM_STR_ENERGY_PURCHASE_VALUE);
+  uint32_t hash_energy_purchase_alarm_ = fnv1_hash(SM_STR_ENERGY_PURCHASE_ALARM);
 
-  ESPPreferenceObject preference_energy_purchase_value_;
-  ESPPreferenceObject preference_energy_purchase_alarm_;
   ESPPreferenceObject preference_delay_value_set_;
   ESPPreferenceObject preference_starting_kWh_;
   ESPPreferenceObject preference_price_kWh_;
+  ESPPreferenceObject preference_energy_purchase_value_;
+  ESPPreferenceObject preference_energy_purchase_alarm_;
 
   SmErrorType error_type_ = SmErrorType::NO_ERROR;
   SmErrorCode error_code_ = SmErrorCode::NO_ERROR;
@@ -409,8 +421,8 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   void print_error_();
 
-  void load_initial_number_value_(ESPPreferenceObject &preference, uint32_t preference_name, uint32_t *value_store);
-  void save_initial_number_value_(ESPPreferenceObject &preference, const uint32_t *value);
+  uint32_t read_initial_number_value_(ESPPreferenceObject &preference, const std::string preference_name, uint32_t default_value);
+  void save_initial_number_value_(ESPPreferenceObject &preference, uint32_t value);
 };
 
 }  // namespace dxs238xw
