@@ -83,6 +83,11 @@ static const char *const TAG = "dxs238xw";
 #define UPDATE_SWITCH(name, value)
 #endif
 
+#define LOAD_PREFERENCE(name, preference, preference_name, default_value) \
+  if (this->name##_number_ != nullptr) { \
+    this->ms_data_.name = this->read_initial_number_value_(preference, preference_name, default_value); \
+  }
+
 //------------------------------------------------------------------------------
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -101,39 +106,47 @@ void Dxs238xwComponent::setup() {
     this->component_state_ &= ~COMPONENT_STATE_MASK;
     this->component_state_ |= COMPONENT_STATE_CONSTRUCTION;
   } else {
-    ESP_LOGI(TAG, "In --- setup");
+    if (this->count_error_data_acquisition_ == 0) {
+      ESP_LOGI(TAG, "In --- setup");
 
-    ESP_LOGI(TAG, "* Initialize Preferences");
-    this->preference_delay_value_set_ = global_preferences->make_preference<uint32_t>(this->hash_delay_value_set_);
-    this->preference_starting_kWh_ = global_preferences->make_preference<uint32_t>(this->hash_starting_kWh_);
-    this->preference_price_kWh_ = global_preferences->make_preference<uint32_t>(this->hash_price_kWh_);
-    this->preference_energy_purchase_value_ = global_preferences->make_preference<uint32_t>(this->hash_energy_purchase_value_);
-    this->preference_energy_purchase_alarm_ = global_preferences->make_preference<uint32_t>(this->hash_energy_purchase_alarm_);
+      ESP_LOGI(TAG, "* Initialize Preferences");
+      this->preference_delay_value_set_ = global_preferences->make_preference<uint32_t>(this->hash_delay_value_set_);
+      this->preference_starting_kWh_ = global_preferences->make_preference<uint32_t>(this->hash_starting_kWh_);
+      this->preference_price_kWh_ = global_preferences->make_preference<uint32_t>(this->hash_price_kWh_);
+      this->preference_energy_purchase_value_ = global_preferences->make_preference<uint32_t>(this->hash_energy_purchase_value_);
+      this->preference_energy_purchase_alarm_ = global_preferences->make_preference<uint32_t>(this->hash_energy_purchase_alarm_);
 
-    ESP_LOGI(TAG, "* Get Initial Values");
-    this->ms_data_.delay_value_set = this->read_initial_number_value_(this->preference_delay_value_set_, SM_STR_DELAY_VALUE_SET, SmLimitValue::MAX_DELAY_SET);
-    this->ms_data_.starting_kWh = this->read_initial_number_value_(this->preference_starting_kWh_, SM_STR_STARTING_KWH, SmLimitValue::MIN_STARTING_KWH);
-    this->ms_data_.price_kWh = this->read_initial_number_value_(this->preference_price_kWh_, SM_STR_PRICE_KWH, SmLimitValue::MIN_PRICE_KWH);
-    this->lp_data_.energy_purchase_value_tmp = this->read_initial_number_value_(this->preference_energy_purchase_value_, SM_STR_ENERGY_PURCHASE_VALUE, SmLimitValue::MIN_ENERGY_PURCHASE_VALUE);
-    this->lp_data_.energy_purchase_alarm_tmp = this->read_initial_number_value_(this->preference_energy_purchase_alarm_, SM_STR_ENERGY_PURCHASE_ALARM, SmLimitValue::MIN_ENERGY_PURCHASE_ALARM);
+      ESP_LOGI(TAG, "* Get Initial Values");
+      LOAD_PREFERENCE(delay_value_set, this->preference_delay_value_set_, SM_STR_DELAY_VALUE_SET, SmLimitValue::MAX_DELAY_SET)
+      LOAD_PREFERENCE(starting_kWh, this->preference_starting_kWh_, SM_STR_STARTING_KWH, SmLimitValue::MIN_STARTING_KWH)
+      LOAD_PREFERENCE(price_kWh, this->preference_price_kWh_, SM_STR_PRICE_KWH, SmLimitValue::MIN_PRICE_KWH)
+      // LOAD_PREFERENCE(energy_purchase_value, this->preference_energy_purchase_value_, SM_STR_ENERGY_PURCHASE_VALUE, SmLimitValue::MIN_ENERGY_PURCHASE_VALUE)
+      // LOAD_PREFERENCE(energy_purchase_alarm, this->preference_energy_purchase_alarm_, SM_STR_ENERGY_PURCHASE_ALARM, SmLimitValue::MIN_ENERGY_PURCHASE_ALARM)
 
-    UPDATE_NUMBER(delay_value_set, this->ms_data_.delay_value_set)
-    UPDATE_NUMBER(starting_kWh, this->ms_data_.starting_kWh)
-    UPDATE_NUMBER(price_kWh, this->ms_data_.price_kWh)
-    UPDATE_NUMBER(energy_purchase_value, this->lp_data_.energy_purchase_value_tmp)
-    UPDATE_NUMBER(energy_purchase_alarm, this->lp_data_.energy_purchase_alarm_tmp)
+      UPDATE_NUMBER(delay_value_set, this->ms_data_.delay_value_set)
+      UPDATE_NUMBER(starting_kWh, this->ms_data_.starting_kWh)
+      UPDATE_NUMBER(price_kWh, this->ms_data_.price_kWh)
+      UPDATE_NUMBER(energy_purchase_value, this->lp_data_.energy_purchase_value_tmp)
+      UPDATE_NUMBER(energy_purchase_alarm, this->lp_data_.energy_purchase_alarm_tmp)
+    }
 
-    ESP_LOGI(TAG, "* Load GET_METER_ID");
-    this->send_command_(SmCommandSend::GET_METER_ID);
+    if (!this->first_data_acquisition_()) {
+      ESP_LOGE(TAG, "* Error in the communication with the meter");
 
-    ESP_LOGI(TAG, "* Load GET_POWER_STATE");
-    this->send_command_(SmCommandSend::GET_POWER_STATE);
+      this->component_state_ &= ~COMPONENT_STATE_MASK;
+      this->component_state_ |= COMPONENT_STATE_CONSTRUCTION;
 
-    ESP_LOGI(TAG, "* Load GET_LIMIT_AND_PURCHASE_DATA");
-    this->send_command_(SmCommandSend::GET_LIMIT_AND_PURCHASE_DATA);
+      this->status_set_error();
 
-    ESP_LOGI(TAG, "* Load GET_MEASUREMENT_DATA");
-    this->send_command_(SmCommandSend::GET_MEASUREMENT_DATA);
+      this->count_error_data_acquisition_++;
+      this->postpone_setup_time_ = 0;
+
+      return;
+    } else {
+      if (this->count_error_data_acquisition_ > 0) {
+        this->status_clear_error();
+      }
+    }
 
     ESP_LOGI(TAG, "Out --- setup");
   }
@@ -439,6 +452,30 @@ void Dxs238xwComponent::set_number_value(SmIdEntity entity, float value) {
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 
+bool Dxs238xwComponent::first_data_acquisition_() {
+  ESP_LOGI(TAG, "* Try to load GET_METER_ID");
+  if (!this->send_command_(SmCommandSend::GET_METER_ID)) {
+    return false;
+  }
+
+  ESP_LOGI(TAG, "* Try to load GET_POWER_STATE");
+  if (!this->send_command_(SmCommandSend::GET_POWER_STATE)) {
+    return false;
+  }
+
+  ESP_LOGI(TAG, "* Try to load GET_LIMIT_AND_PURCHASE_DATA");
+  if (!this->send_command_(SmCommandSend::GET_LIMIT_AND_PURCHASE_DATA)) {
+    return false;
+  }
+
+  ESP_LOGI(TAG, "* Try to load GET_MEASUREMENT_DATA");
+  if (!this->send_command_(SmCommandSend::GET_MEASUREMENT_DATA)) {
+    return false;
+  }
+
+  return true;
+}
+
 bool Dxs238xwComponent::transmit_serial_data_(uint8_t *array, uint8_t size) {
   while (available() > 0) {
     read();
@@ -623,7 +660,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
         this->ms_data_.warning_off_by_end_purchase = (receive_array[1] == 21 ? receive_array[19] : false);
       }
 
-      if (!this->ms_data_.warning_off_by_end_delay) {
+      if (!this->ms_data_.warning_off_by_end_delay && this->get_component_state() == COMPONENT_STATE_LOOP) {
         this->ms_data_.warning_off_by_end_delay = (this->ms_data_.delay_value_remaining == 0 && this->ms_data_.delay_state);
       }
 
@@ -637,7 +674,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *receive_array) {
         ESP_LOGD(TAG, "* New Power State = %s", ONOFF(this->ms_data_.meter_state));
       }
 
-      if (this->ms_data_.warning_off_by_end_delay && this->ms_data_.delay_state) {
+      if ((this->ms_data_.warning_off_by_end_delay && this->ms_data_.delay_state) || (this->get_component_state() == COMPONENT_STATE_SETUP && this->ms_data_.delay_state)) {
         ESP_LOGD(TAG, "* End Delay, trying to set Delay State to off");
 
         if (this->send_command_(SmCommandSend::SET_DELAY, false, false)) {

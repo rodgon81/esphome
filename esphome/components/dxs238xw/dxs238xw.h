@@ -376,6 +376,8 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   LimitAndPurchaseData lp_data_;
   MeterStateData ms_data_;
 
+  uint32_t count_error_data_acquisition_ = 0;
+
   uint32_t hash_delay_value_set_ = fnv1_hash(SM_STR_DELAY_VALUE_SET);
   uint32_t hash_starting_kWh_ = fnv1_hash(SM_STR_STARTING_KWH);
   uint32_t hash_price_kWh_ = fnv1_hash(SM_STR_PRICE_KWH);
@@ -396,6 +398,8 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   uint32_t postpone_setup_time_ = 0;
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  bool first_data_acquisition_();
 
   void set_meter_state_(bool state);
 
