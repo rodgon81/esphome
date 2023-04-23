@@ -47,7 +47,7 @@ static const char *const TAG = "wall01fan";
     this->column_2##_binary_output_->set_state(!state_led_2); \
   }
 #else
-#define UPDATE_BINARY_INPUT_OUTPUT(name, value)
+#define UPDATE_BINARY_INPUT_OUTPUT(row, column_1, column_2, action, state_led_1, state_led_2)
 #endif
 
 #ifdef USE_STATUS_LED
@@ -95,7 +95,8 @@ void Wall01fanComponent::loop() {
 }
 
 void Wall01fanComponent::dump_config() {
-  // ESP_LOGCONFIG(TAG, "* energy_purchase_value: %u", this->lp_data_.energy_purchase_value_tmp);
+  //
+  ESP_LOGCONFIG(TAG, "*** COMPONENT VERSION: %s ***", STR_COMPONENT_VERSION);
 }
 
 //------------------------------------------------------------------------------

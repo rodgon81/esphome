@@ -1,18 +1,7 @@
 #pragma once
 
 #include "esphome/core/application.h"
-#include "esphome/core/component.h"
-#include "esphome/core/defines.h"
-#include "esphome/core/hal.h"
-#include "esphome/core/helpers.h"
-#include "esphome/core/preferences.h"
 
-#ifdef USE_SWITCH
-#include "esphome/components/switch/switch.h"
-#endif
-#ifdef USE_TEXT_SENSOR
-#include "esphome/components/text_sensor/text_sensor.h"
-#endif
 #ifdef USE_BINARY_OUTPUT
 #include "esphome/components/output/binary_output.h"
 #endif
@@ -22,6 +11,8 @@
 
 namespace esphome {
 namespace wall01fan {
+
+static const char *const STR_COMPONENT_VERSION = "1.0.0000";
 
 //------------------------------------------------------------------------------
 // DEFAULTS
