@@ -123,6 +123,7 @@ void Dxs238xwComponent::setup() {
       UPDATE_NUMBER(delay_value_set, this->ms_data_.delay_value_set)
       UPDATE_NUMBER(starting_kWh, this->ms_data_.starting_kWh)
       UPDATE_NUMBER(price_kWh, this->ms_data_.price_kWh)
+      UPDATE_SENSOR(price_kWh, this->ms_data_.price_kWh)
       UPDATE_NUMBER(energy_purchase_value, this->lp_data_.energy_purchase_value)
       UPDATE_NUMBER(energy_purchase_alarm, this->lp_data_.energy_purchase_alarm)
     }
@@ -421,7 +422,7 @@ void Dxs238xwComponent::set_number_value(SmIdEntity entity, float value) {
         this->save_initial_number_value_(this->preference_starting_kWh_, this->ms_data_.starting_kWh);
 
         UPDATE_SENSOR(contract_total_energy, this->ms_data_.starting_kWh + this->ms_data_.total_energy)
-
+        UPDATE_SENSOR(total_energy, this->ms_data_.total_energy)
         UPDATE_NUMBER(starting_kWh, this->ms_data_.starting_kWh)
         break;
       }
@@ -433,6 +434,7 @@ void Dxs238xwComponent::set_number_value(SmIdEntity entity, float value) {
         UPDATE_SENSOR(total_energy_price, this->ms_data_.price_kWh * this->ms_data_.total_energy)
 
         UPDATE_NUMBER(price_kWh, this->ms_data_.price_kWh)
+        UPDATE_SENSOR(price_kWh, this->ms_data_.price_kWh)
         break;
       }
       default: {

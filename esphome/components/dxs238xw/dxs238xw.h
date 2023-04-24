@@ -6,7 +6,7 @@
 namespace esphome {
 namespace dxs238xw {
 
-static const char *const SM_STR_COMPONENT_VERSION = "1.0.8000";
+static const char *const SM_STR_COMPONENT_VERSION = "1.0.9000";
 
 //------------------------------------------------------------------------------
 // DEFAULTS
@@ -320,6 +320,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   DXS238XW_SENSOR(energy_purchase_price)
   DXS238XW_SENSOR(contract_total_energy)
   DXS238XW_SENSOR(total_energy_price)
+  DXS238XW_SENSOR(price_kWh)
 
   DXS238XW_TEXT_SENSOR(delay_value_remaining)
   DXS238XW_TEXT_SENSOR(meter_state_detail)

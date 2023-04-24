@@ -68,6 +68,8 @@ CONF_ENERGY_PURCHASE_PRICE = "energy_purchase_price"
 CONF_TOTAL_ENERGY_PRICE = "total_energy_price"
 CONF_CONTRACT_TOTAL_ENERGY = "contract_total_energy"
 
+CONF_PRICE_KWH = "price_kWh"
+
 UNIT_CURRENCY_DOLLAR = "$"
 
 TYPES = {
@@ -115,25 +117,25 @@ TYPES = {
     ),
     CONF_REACTIVE_POWER_TOTAL: sensor.sensor_schema(
         unit_of_measurement=UNIT_KILOVOLT_AMPS_REACTIVE,
-        accuracy_decimals=4,
+        accuracy_decimals=3,
         device_class=DEVICE_CLASS_REACTIVE_POWER,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
     CONF_REACTIVE_POWER_PHASE_1: sensor.sensor_schema(
         unit_of_measurement=UNIT_KILOVOLT_AMPS_REACTIVE,
-        accuracy_decimals=4,
+        accuracy_decimals=3,
         device_class=DEVICE_CLASS_REACTIVE_POWER,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
     CONF_REACTIVE_POWER_PHASE_2: sensor.sensor_schema(
         unit_of_measurement=UNIT_KILOVOLT_AMPS_REACTIVE,
-        accuracy_decimals=4,
+        accuracy_decimals=3,
         device_class=DEVICE_CLASS_REACTIVE_POWER,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
     CONF_REACTIVE_POWER_PHASE_3: sensor.sensor_schema(
         unit_of_measurement=UNIT_KILOVOLT_AMPS_REACTIVE,
-        accuracy_decimals=4,
+        accuracy_decimals=3,
         device_class=DEVICE_CLASS_REACTIVE_POWER,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
@@ -223,6 +225,11 @@ TYPES = {
         unit_of_measurement=UNIT_KILOWATT_HOURS,
         icon="mdi:home-lightning-bolt-outline",
         accuracy_decimals=2,
+    ),
+    CONF_PRICE_KWH: sensor.sensor_schema(
+        unit_of_measurement=UNIT_CURRENCY_DOLLAR,
+        icon="mdi:cash",
+        accuracy_decimals=1,
     ),
 }
 
