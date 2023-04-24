@@ -4,7 +4,6 @@ import esphome.codegen as cg
 
 from esphome.const import (
     CONF_ICON,
-    CONF_STEP,
     CONF_ENTITY_CATEGORY,
     ENTITY_CATEGORY_CONFIG,
     CONF_UNIT_OF_MEASUREMENT,
@@ -49,7 +48,6 @@ TYPES = {
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,
-                cv.Optional(CONF_STEP, default=1): cv.uint32_t,
             }
         ),
         SmLimitValue.MIN_CURRENT,
@@ -68,7 +66,6 @@ TYPES = {
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,
-                cv.Optional(CONF_STEP, default=1): cv.uint32_t,
             }
         ),
         SmLimitValue.MIN_VOLTAGE,
@@ -87,7 +84,6 @@ TYPES = {
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,
-                cv.Optional(CONF_STEP, default=1): cv.uint32_t,
             }
         ),
         SmLimitValue.MIN_VOLTAGE,
@@ -106,7 +102,6 @@ TYPES = {
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,
-                cv.Optional(CONF_STEP, default=1): cv.uint32_t,
             }
         ),
         SmLimitValue.MIN_ENERGY_PURCHASE_VALUE,
@@ -125,7 +120,6 @@ TYPES = {
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,
-                cv.Optional(CONF_STEP, default=1): cv.uint32_t,
             }
         ),
         SmLimitValue.MIN_ENERGY_PURCHASE_ALARM,
@@ -144,7 +138,6 @@ TYPES = {
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,
-                cv.Optional(CONF_STEP, default=1): cv.uint32_t,
             }
         ),
         SmLimitValue.MIN_DELAY_SET,
@@ -165,12 +158,11 @@ TYPES = {
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,
-                cv.Optional(CONF_STEP, default=1): cv.uint32_t,
             }
         ),
-        SmLimitValue.MIN_STARTING_KWH,
-        SmLimitValue.MAX_STARTING_KWH,
-        SmLimitValue.STEP_STARTING_KWH,
+        SmLimitValue.MIN_STARTING_KWH + 0.0,
+        SmLimitValue.MAX_STARTING_KWH + 0.9,
+        SmLimitValue.STEP_STARTING_KWH + 0.1,
         SmIdEntity.NUMBER_STARTING_KWH,
     ),
     PRICE_KWH: (
@@ -184,12 +176,11 @@ TYPES = {
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,
-                cv.Optional(CONF_STEP, default=1): cv.uint32_t,
             }
         ),
-        SmLimitValue.MIN_PRICE_KWH,
-        SmLimitValue.MAX_PRICE_KWH,
-        SmLimitValue.STEP_PRICE_KWH,
+        SmLimitValue.MIN_PRICE_KWH + 0.0,
+        SmLimitValue.MAX_PRICE_KWH + 0.9,
+        SmLimitValue.STEP_PRICE_KWH + 0.1,
         SmIdEntity.NUMBER_PRICE_KWH,
     ),
 }

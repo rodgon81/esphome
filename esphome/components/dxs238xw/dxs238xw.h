@@ -6,7 +6,7 @@
 namespace esphome {
 namespace dxs238xw {
 
-static const char *const SM_STR_COMPONENT_VERSION = "1.0.6000";
+static const char *const SM_STR_COMPONENT_VERSION = "1.0.7000";
 
 //------------------------------------------------------------------------------
 // DEFAULTS
@@ -168,7 +168,7 @@ enum SmLimitValue : uint32_t {
   MIN_CURRENT = 1,                     // A
   MAX_CURRENT = 60,                    // A
   STEP_CURRENT = 1,                    // Unit
-  MIN_DELAY_SET = 0,                   // minutes
+  MIN_DELAY_SET = 1,                   // minutes
   MAX_DELAY_SET = 1440,                // minutes
   STEP_DELAY_SET = 1,                  // Unit
   MIN_ENERGY_PURCHASE_ALARM = 0,       // kWh
@@ -179,22 +179,18 @@ enum SmLimitValue : uint32_t {
   STEP_ENERGY_PURCHASE_VALUE = 1,      // Unit
   MIN_STARTING_KWH = 0,                // kWh
   MAX_STARTING_KWH = 999999,           // kWh
-  STEP_STARTING_KWH = 1,               // Unit
+  STEP_STARTING_KWH = 0,               // Unit
   MIN_PRICE_KWH = 0,                   // $
   MAX_PRICE_KWH = 999999,              // $
-  STEP_PRICE_KWH = 1,                  // Unit
+  STEP_PRICE_KWH = 0,                  // Unit
 };
 
 struct LimitAndPurchaseData {
   uint32_t time = 0;
 
-  float energy_purchase_value = 0;
-  uint32_t energy_purchase_value_tmp = 0;
-  float energy_purchase_alarm = 0;
-  uint32_t energy_purchase_alarm_tmp = 0;
-
+  uint32_t energy_purchase_value = 0;
+  uint32_t energy_purchase_alarm = 0;
   float energy_purchase_balance = 0;
-
   bool energy_purchase_state = false;
 
   uint8_t max_current_limit = 0;
@@ -219,8 +215,8 @@ struct MeterStateData {
   bool meter_state = false;
   bool delay_state = false;
 
-  uint32_t starting_kWh = 0;
-  uint32_t price_kWh = 0;
+  float starting_kWh = 0;
+  float price_kWh = 0;
 
   float total_energy = 0;
 
@@ -425,8 +421,11 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   void print_error_();
 
-  uint32_t read_initial_number_value_(ESPPreferenceObject &preference, const std::string preference_name, uint32_t default_value);
+  uint32_t read_initial_number_value_(ESPPreferenceObject &preference, const std::string preference_string, uint32_t default_value);
   void save_initial_number_value_(ESPPreferenceObject &preference, uint32_t value);
+
+  float read_initial_number_value_(ESPPreferenceObject &preference, const std::string preference_string, float default_value);
+  void save_initial_number_value_(ESPPreferenceObject &preference, float value);
 };
 
 }  // namespace dxs238xw
