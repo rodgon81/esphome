@@ -128,8 +128,6 @@ void Dxs238xwComponent::setup() {
     }
 
     if (!this->first_data_acquisition_()) {
-      ESP_LOGE(TAG, "* Error in the communication with the meter");
-
       this->component_state_ &= ~COMPONENT_STATE_MASK;
       this->component_state_ |= COMPONENT_STATE_CONSTRUCTION;
 

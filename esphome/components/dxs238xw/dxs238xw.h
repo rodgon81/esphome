@@ -6,7 +6,7 @@
 namespace esphome {
 namespace dxs238xw {
 
-static const char *const SM_STR_COMPONENT_VERSION = "1.0.7000";
+static const char *const SM_STR_COMPONENT_VERSION = "1.0.8000";
 
 //------------------------------------------------------------------------------
 // DEFAULTS
