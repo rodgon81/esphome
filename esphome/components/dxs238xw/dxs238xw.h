@@ -5,7 +5,7 @@
 
 /*
   TODO:
-  1- Correguir decimales en sensores Numeros
+  1- Corregir decimales en sensores Numeros
 */
 
 namespace esphome {
