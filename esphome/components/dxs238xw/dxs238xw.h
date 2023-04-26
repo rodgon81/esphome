@@ -3,10 +3,15 @@
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/application.h"
 
+/*
+  TODO:
+  1- Correguir decimales en sensores Numeros
+*/
+
 namespace esphome {
 namespace dxs238xw {
 
-static const char *const SM_STR_COMPONENT_VERSION = "1.0.9000";
+static const char *const SM_STR_COMPONENT_VERSION = "1.1.0000";
 
 //------------------------------------------------------------------------------
 // DEFAULTS

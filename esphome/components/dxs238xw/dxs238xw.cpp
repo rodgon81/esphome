@@ -422,7 +422,6 @@ void Dxs238xwComponent::set_number_value(SmIdEntity entity, float value) {
         this->save_initial_number_value_(this->preference_starting_kWh_, this->ms_data_.starting_kWh);
 
         UPDATE_SENSOR(contract_total_energy, this->ms_data_.starting_kWh + this->ms_data_.total_energy)
-        UPDATE_SENSOR(total_energy, this->ms_data_.total_energy)
         UPDATE_NUMBER(starting_kWh, this->ms_data_.starting_kWh)
         break;
       }
