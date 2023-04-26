@@ -23,6 +23,7 @@ from esphome.const import (
     UNIT_KILOWATT,
     UNIT_KILOWATT_HOURS,
     ENTITY_CATEGORY_DIAGNOSTIC,
+    DEVICE_CLASS_MONETARY,
 )
 
 from .. import CONF_DXS238XW_ID, DXS238XW_COMPONENT_SCHEMA
@@ -54,13 +55,7 @@ CONF_POWER_FACTOR_PHASE_3 = "power_factor_phase_3"
 
 CONF_TOTAL_ENERGY = "total_energy"
 
-CONF_ENERGY_PURCHASE_VALUE = "energy_purchase_value"
-CONF_ENERGY_PURCHASE_ALARM = "energy_purchase_alarm"
 CONF_ENERGY_PURCHASE_BALANCE = "energy_purchase_balance"
-
-CONF_MAX_CURRENT_LIMIT = "max_current_limit"
-CONF_MAX_VOLTAGE_LIMIT = "max_voltage_limit"
-CONF_MIN_VOLTAGE_LIMIT = "min_voltage_limit"
 
 CONF_PHASE_COUNT = "phase_count"
 
@@ -213,23 +208,25 @@ TYPES = {
     ),
     CONF_ENERGY_PURCHASE_PRICE: sensor.sensor_schema(
         unit_of_measurement=UNIT_CURRENCY_DOLLAR,
-        icon="mdi:cash",
         accuracy_decimals=2,
+        device_class=DEVICE_CLASS_MONETARY,
     ),
     CONF_TOTAL_ENERGY_PRICE: sensor.sensor_schema(
         unit_of_measurement=UNIT_CURRENCY_DOLLAR,
-        icon="mdi:cash",
         accuracy_decimals=2,
+        device_class=DEVICE_CLASS_MONETARY,
     ),
     CONF_CONTRACT_TOTAL_ENERGY: sensor.sensor_schema(
         unit_of_measurement=UNIT_KILOWATT_HOURS,
         icon="mdi:home-lightning-bolt-outline",
         accuracy_decimals=2,
+        device_class=DEVICE_CLASS_ENERGY,
+        state_class=STATE_CLASS_TOTAL,
     ),
     CONF_PRICE_KWH: sensor.sensor_schema(
         unit_of_measurement=UNIT_CURRENCY_DOLLAR,
-        icon="mdi:cash",
         accuracy_decimals=1,
+        device_class=DEVICE_CLASS_MONETARY,
     ),
 }
 
