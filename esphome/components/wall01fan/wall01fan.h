@@ -204,6 +204,7 @@ class Wall01fanComponent : public Component {
   WALL01FAN_BINARY_INPUT_OUTPUT(row_4)
   WALL01FAN_BINARY_INPUT_OUTPUT(row_5)
 
+  WALL01FAN_BINARY_OUTPUT(led_oscillation)
   WALL01FAN_BINARY_OUTPUT(oscillation)
   WALL01FAN_BINARY_OUTPUT(speed_low)
   WALL01FAN_BINARY_OUTPUT(speed_mid)

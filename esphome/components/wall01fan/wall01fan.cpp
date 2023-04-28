@@ -323,6 +323,7 @@ void Wall01fanComponent::set_oscillation_(bool state) {
   ESP_LOGD(TAG, "Set oscillation = %s", TRUEFALSE(this->fan_data_.is_oscillation_on));
 
   UPDATE_SWITCH(oscillation, this->fan_data_.is_oscillation_on)
+  UPDATE_BINARY_OUTPUT(led_oscillation, this->fan_data_.is_oscillation_on)
   UPDATE_BINARY_OUTPUT(oscillation, this->fan_data_.is_oscillation_on)
 }
 

@@ -7,6 +7,8 @@ from .. import wall01fan_ns, CONF_WALL01FAN_ID, WALL01FAN_COMPONENT_SCHEMA
 
 DEPENDENCIES = ["wall01fan"]
 
+CONF_LED_OSCILLATION = "led_oscillation"
+
 CONF_OSCILLATION = "oscillation"
 CONF_SPEED_LOW = "speed_low"
 CONF_SPEED_MID = "speed_mid"
@@ -28,6 +30,12 @@ Wall01fanBinaryOutput = wall01fan_ns.class_(
 )
 
 TYPES = {
+    CONF_LED_OSCILLATION: output.BINARY_OUTPUT_SCHEMA.extend(
+        {
+            cv.GenerateID(): cv.declare_id(Wall01fanBinaryOutput),
+            cv.Required(CONF_PIN): pins.internal_gpio_output_pin_schema,
+        }
+    ),
     CONF_OSCILLATION: output.BINARY_OUTPUT_SCHEMA.extend(
         {
             cv.GenerateID(): cv.declare_id(Wall01fanBinaryOutput),
