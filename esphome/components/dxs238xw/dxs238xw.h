@@ -3,11 +3,6 @@
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/application.h"
 
-/*
-  TODO:
-  1- Corregir decimales en sensores Numeros
-*/
-
 namespace esphome {
 namespace dxs238xw {
 
