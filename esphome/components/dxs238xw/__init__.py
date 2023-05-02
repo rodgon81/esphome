@@ -55,9 +55,7 @@ SmIdEntity = dxs238xw_ns.enum("SmIdEntity", True)
 SmLimitValue = dxs238xw_ns.enum("SmLimitValue")
 
 DXS238XW_COMPONENT_SCHEMA = cv.Schema(
-    {
-        cv.GenerateID(CONF_DXS238XW_ID): cv.use_id(Dxs238xwComponent),
-    }
+    {cv.GenerateID(CONF_DXS238XW_ID): cv.use_id(Dxs238xwComponent), }
 )
 
 CONFIG_SCHEMA = cv.All(
@@ -158,10 +156,10 @@ def validate_uart(
     )
 
 
-def validate_config(config):
+def validate_entities(config):
     def raise_error(property: str, component: str, model: str):
         raise cv.Invalid(
-            f"Property {property} in component {component} in not valid for the model {model}"
+            f"Entity '{property}' in component '{component}' is not valid for the model '{model}'"
         )
 
     for component in LIST_SENSOR:
@@ -179,7 +177,52 @@ def validate_config(config):
     return config
 
 
-FINAL_VALIDATE_SCHEMA = validate_config
+def validate_protocol_and_model(config):
+    if config[CONF_PROTOCOL] == PROTOCOL_HEKR:
+        if config[CONF_MODEL] == MODEL_DDS238_2:
+            raise cv.Invalid(
+                f"This configuration has not been tested, if you have this meter and want support contact the developer"
+            )
+        elif config[CONF_MODEL] == MODEL_DDS238_4:
+            _LOGGER.info(
+                "Model and protocol supported"
+            )
+        elif config[CONF_MODEL] == MODEL_DTS238_7:
+            _LOGGER.info(
+                "Model and protocol supported"
+            )
+
+    if config[CONF_PROTOCOL] == PROTOCOL_TUYA:
+        if config[CONF_MODEL] == MODEL_DDS238_2:
+            _LOGGER.info(
+                "Model and protocol supported"
+            )
+        elif config[CONF_MODEL] == MODEL_DDS238_4:
+            raise cv.Invalid(
+                f"This configuration has not been tested, if you have this meter and want support contact the developer"
+            )
+        elif config[CONF_MODEL] == MODEL_DTS238_7:
+            raise cv.Invalid(
+                f"This configuration has not been tested, if you have this meter and want support contact the developer"
+            )
+
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = cv.All(
+    validate_uart(
+        component=COMPONENT_NAME,
+        tx_pin=1,
+        rx_pin=3,
+        baud_rate=9600,
+        parity="NONE",
+        rx_buffer_size=256,
+        stop_bits=1,
+        data_bits=8,
+    ),
+    validate_entities,
+    validate_protocol_and_model,
+)
 
 
 async def to_code(config):
