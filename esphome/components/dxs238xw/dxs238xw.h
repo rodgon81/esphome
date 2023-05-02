@@ -6,7 +6,19 @@
 namespace esphome {
 namespace dxs238xw {
 
-static const char *const SM_STR_COMPONENT_VERSION = "1.1.0000";
+// #define USE_PROTOCOL_HEKR
+// #define USE_PROTOCOL_TUYA
+
+// #define USE_MODEL_DDS238_2
+// #define USE_MODEL_DDS238_4
+// #define USE_MODEL_DTS238_7
+
+// #define USE_RAW_MESSAGE
+
+#define EMPTY_DATA \
+  std::vector<uint8_t> {}
+
+static const char *const SM_STR_COMPONENT_VERSION = "2.0.0000 beta";
 
 //------------------------------------------------------------------------------
 // DEFAULTS
@@ -20,7 +32,8 @@ static const uint16_t SM_POSTPONE_SETUP_TIME = 10000;
 static const uint16_t SM_POSTPONE_SETUP_TIME = 2500;
 #endif
 
-static const uint16_t SM_MAX_MILLIS_TO_CONFIRM = 200;
+static const uint16_t SM_MAX_MILLIS_TO_RX_BYTE = 50;
+static const uint16_t SM_MAX_MILLIS_TO_CONFIRM = 300;  // 200
 static const uint16_t SM_MAX_MILLIS_TO_RESPONSE = 1000;
 
 //------------------------------------------------------------------------------
@@ -33,25 +46,12 @@ static const uint8_t SM_MAX_HEX_MSG_LENGTH_PARSE = 176;
 
 // Header
 static const uint8_t HEKR_HEADER = 0x48;
+static const uint8_t TUYA_HEADER_1 = 0x55;
+static const uint8_t TUYA_HEADER_2 = 0xAA;
 
 // Type message
 static const uint8_t HEKR_TYPE_RECEIVE = 0x01;
 static const uint8_t HEKR_TYPE_SEND = 0x02;
-
-// Command
-static const uint8_t HEKR_CMD_RECEIVE_METER_STATE = 0x01;
-static const uint8_t HEKR_CMD_RECEIVE_MEASUREMENT = 0x0B;
-static const uint8_t HEKR_CMD_RECEIVE_LIMIT_AND_PURCHASE = 0x08;
-static const uint8_t HEKR_CMD_RECEIVE_METER_ID = 0x07;
-static const uint8_t HEKR_CMD_SEND_SET_LIMIT = 0x03;
-static const uint8_t HEKR_CMD_SEND_SET_PURCHASE = 0x0D;
-static const uint8_t HEKR_CMD_SEND_SET_METER_STATE = 0x09;
-static const uint8_t HEKR_CMD_SEND_SET_DELAY = 0x0C;
-static const uint8_t HEKR_CMD_SEND_SET_RESET = 0x05;
-static const uint8_t HEKR_CMD_SEND_GET_METER_STATE = 0x00;
-static const uint8_t HEKR_CMD_SEND_GET_MEASUREMENT = 0x0A;
-static const uint8_t HEKR_CMD_SEND_GET_LIMIT_AND_PURCHASE = 0x02;
-static const uint8_t HEKR_CMD_SEND_GET_METER_ID = 0x06;
 
 //------------------------------------------------------------------------------
 
@@ -97,6 +97,11 @@ static const char *const SM_STR_STARTING_KWH = "starting_kWh";
 static const char *const SM_STR_PRICE_KWH = "price_kWh";
 static const char *const SM_STR_ENERGY_PURCHASE_VALUE = "energy_purchase_value";
 static const char *const SM_STR_ENERGY_PURCHASE_ALARM = "energy_purchase_alarm";
+
+// Tuya Datapoint
+static const uint8_t DATAPOINT_SWITCH_ENERGY_PURCHASE_STATE = 1;
+static const uint8_t DATAPOINT_SWITCH_METER_STATE = 2;
+static const uint8_t DATAPOINT_SWITCH_DELAY_STATE = 3;
 
 enum class SmErrorMeterStateType : uint8_t {
   POWER_OK,
@@ -185,12 +190,92 @@ enum SmLimitValue : uint32_t {
   STEP_PRICE_KWH = 0,                  // Unit
 };
 
-struct LimitAndPurchaseData {
-  uint32_t time = 0;
+enum class TuyaInitState : uint8_t {
+  INIT_HEARTBEAT = 0x00,
+  INIT_PRODUCT,
+  INIT_CONF,
+  INIT_WIFI,
+  INIT_DATAPOINT,
+  INIT_DONE,
+};
 
+#ifdef USE_PROTOCOL_HEKR
+enum class ResponseType : uint8_t {
+  HEKR_CMD_RECEIVE_METER_STATE = 0x01,
+  HEKR_CMD_RECEIVE_MEASUREMENT = 0x0B,
+  HEKR_CMD_RECEIVE_LIMIT_AND_PURCHASE = 0x08,
+  HEKR_CMD_RECEIVE_METER_ID = 0x07,
+};
+
+enum class CommandType : uint8_t {
+  HEKR_CMD_SEND_SET_LIMIT = 0x03,
+  HEKR_CMD_SEND_SET_PURCHASE = 0x0D,
+  HEKR_CMD_SEND_SET_METER_STATE = 0x09,
+  HEKR_CMD_SEND_SET_DELAY = 0x0C,
+  HEKR_CMD_SEND_SET_RESET = 0x05,
+  HEKR_CMD_SEND_GET_METER_STATE = 0x00,
+  HEKR_CMD_SEND_GET_MEASUREMENT = 0x0A,
+  HEKR_CMD_SEND_GET_LIMIT_AND_PURCHASE = 0x02,
+  HEKR_CMD_SEND_GET_METER_ID = 0x06,
+};
+#endif
+
+#ifdef USE_PROTOCOL_TUYA
+enum class CommandType : uint8_t {
+  HEARTBEAT = 0x00,
+  PRODUCT_QUERY = 0x01,
+  CONF_QUERY = 0x02,
+  WIFI_STATE = 0x03,
+  WIFI_RESET = 0x04,
+  WIFI_SELECT = 0x05,
+  DATAPOINT_DELIVER = 0x06,
+  DATAPOINT_REPORT = 0x07,
+  DATAPOINT_QUERY = 0x08,
+  WIFI_TEST = 0x0E,
+  LOCAL_TIME_QUERY = 0x1C,
+  WIFI_RSSI = 0x24,
+  VACUUM_MAP_UPLOAD = 0x28,
+  GET_NETWORK_STATUS = 0x2B,
+};
+
+enum class TuyaDatapointType : uint8_t {
+  RAW = 0x00,      // variable length
+  BOOLEAN = 0x01,  // 1 byte (0/1)
+  INTEGER = 0x02,  // 4 byte
+  STRING = 0x03,   // variable length
+  ENUM = 0x04,     // 1 byte
+  BITMASK = 0x05,  // 1/2/4 bytes
+};
+
+struct TuyaDatapoint {
+  uint8_t id;
+  TuyaDatapointType type;
+  size_t len;
+
+  union {
+    bool value_bool;
+    int value_int;
+    uint32_t value_uint;
+    uint8_t value_enum;
+    uint32_t value_bitmask;
+  };
+
+  std::string value_string;
+  std::vector<uint8_t> value_raw;
+};
+#endif
+
+struct SmCommand {
+  CommandType cmd;
+  std::vector<uint8_t> payload;
+  bool null_old_response = false;
+};
+
+struct LimitAndPurchaseData {
   uint32_t energy_purchase_value = 0;
   uint32_t energy_purchase_alarm = 0;
-  float energy_purchase_balance = 0;
+  uint32_t energy_purchase_balance = 0;  // old float
+
   bool energy_purchase_state = false;
 
   uint8_t max_current_limit = 0;
@@ -199,8 +284,6 @@ struct LimitAndPurchaseData {
 };
 
 struct MeterStateData {
-  uint32_t time = 0;
-
   uint8_t phase_count = 0;
 
   bool warning_off_by_over_voltage = false;
@@ -215,8 +298,8 @@ struct MeterStateData {
   bool meter_state = false;
   bool delay_state = false;
 
-  float starting_kWh = 0;
-  float price_kWh = 0;
+  uint32_t starting_kWh = 0;  // old float
+  uint32_t price_kWh = 0;     // old float
 
   float total_energy = 0;
 
@@ -293,47 +376,59 @@ struct MeterStateData {
 #endif
 
 class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
-  DXS238XW_SENSOR(current_phase_1)
-  DXS238XW_SENSOR(current_phase_2)
-  DXS238XW_SENSOR(current_phase_3)
-  DXS238XW_SENSOR(voltage_phase_1)
-  DXS238XW_SENSOR(voltage_phase_2)
-  DXS238XW_SENSOR(voltage_phase_3)
-  DXS238XW_SENSOR(reactive_power_total)
-  DXS238XW_SENSOR(reactive_power_phase_1)
-  DXS238XW_SENSOR(reactive_power_phase_2)
-  DXS238XW_SENSOR(reactive_power_phase_3)
-  DXS238XW_SENSOR(active_power_total)
-  DXS238XW_SENSOR(active_power_phase_1)
-  DXS238XW_SENSOR(active_power_phase_2)
-  DXS238XW_SENSOR(active_power_phase_3)
-  DXS238XW_SENSOR(power_factor_total)
-  DXS238XW_SENSOR(power_factor_phase_1)
-  DXS238XW_SENSOR(power_factor_phase_2)
-  DXS238XW_SENSOR(power_factor_phase_3)
+#ifdef USE_MODEL_DDS238_2
+  DXS238XW_SENSOR(frequency)
+  DXS238XW_SENSOR(current)
+  DXS238XW_SENSOR(voltage)
+  DXS238XW_SENSOR(reactive_power)
+  DXS238XW_SENSOR(active_power)
+  DXS238XW_SENSOR(power_factor)
   DXS238XW_SENSOR(import_active_energy)
   DXS238XW_SENSOR(export_active_energy)
   DXS238XW_SENSOR(total_energy)
-  DXS238XW_SENSOR(frequency)
-  DXS238XW_SENSOR(energy_purchase_balance)
-  DXS238XW_SENSOR(phase_count)
-  DXS238XW_SENSOR(energy_purchase_price)
-  DXS238XW_SENSOR(contract_total_energy)
   DXS238XW_SENSOR(total_energy_price)
+  DXS238XW_SENSOR(contract_total_energy)
   DXS238XW_SENSOR(price_kWh)
 
-  DXS238XW_TEXT_SENSOR(delay_value_remaining)
   DXS238XW_TEXT_SENSOR(meter_state_detail)
-  DXS238XW_TEXT_SENSOR(meter_id)
+
+  DXS238XW_NUMBER(max_current_limit)
+  DXS238XW_NUMBER(max_voltage_limit)
+  DXS238XW_NUMBER(min_voltage_limit)
+  DXS238XW_NUMBER(starting_kWh)
+  DXS238XW_NUMBER(price_kWh)
+
+  DXS238XW_SWITCH(meter_state)
+
+  DXS238XW_BUTTON(reset_data)
 
   DXS238XW_BINARY_SENSOR(warning_off_by_over_voltage)
   DXS238XW_BINARY_SENSOR(warning_off_by_under_voltage)
   DXS238XW_BINARY_SENSOR(warning_off_by_over_current)
-  DXS238XW_BINARY_SENSOR(warning_off_by_end_purchase)
-  DXS238XW_BINARY_SENSOR(warning_off_by_end_delay)
   DXS238XW_BINARY_SENSOR(warning_off_by_user)
-  DXS238XW_BINARY_SENSOR(warning_purchase_alarm)
   DXS238XW_BINARY_SENSOR(meter_state)
+#endif
+
+#ifdef USE_MODEL_DDS238_4
+  DXS238XW_SENSOR(frequency)
+  DXS238XW_SENSOR(current)
+  DXS238XW_SENSOR(voltage)
+  DXS238XW_SENSOR(reactive_power)
+  DXS238XW_SENSOR(active_power)
+  DXS238XW_SENSOR(power_factor)
+  DXS238XW_SENSOR(import_active_energy)
+  DXS238XW_SENSOR(export_active_energy)
+  DXS238XW_SENSOR(phase_count)
+  DXS238XW_SENSOR(energy_purchase_balance)
+  DXS238XW_SENSOR(energy_purchase_price)
+  DXS238XW_SENSOR(total_energy)
+  DXS238XW_SENSOR(total_energy_price)
+  DXS238XW_SENSOR(contract_total_energy)
+  DXS238XW_SENSOR(price_kWh)
+
+  DXS238XW_TEXT_SENSOR(meter_state_detail)
+  DXS238XW_TEXT_SENSOR(delay_value_remaining)
+  DXS238XW_TEXT_SENSOR(meter_id)
 
   DXS238XW_NUMBER(max_current_limit)
   DXS238XW_NUMBER(max_voltage_limit)
@@ -350,6 +445,75 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   DXS238XW_BUTTON(reset_data)
 
+  DXS238XW_BINARY_SENSOR(warning_off_by_over_voltage)
+  DXS238XW_BINARY_SENSOR(warning_off_by_under_voltage)
+  DXS238XW_BINARY_SENSOR(warning_off_by_over_current)
+  DXS238XW_BINARY_SENSOR(warning_off_by_end_purchase)
+  DXS238XW_BINARY_SENSOR(warning_off_by_end_delay)
+  DXS238XW_BINARY_SENSOR(warning_off_by_user)
+  DXS238XW_BINARY_SENSOR(warning_purchase_alarm)
+  DXS238XW_BINARY_SENSOR(meter_state)
+#endif
+
+#ifdef USE_MODEL_DTS238_7
+  DXS238XW_SENSOR(frequency)
+  DXS238XW_SENSOR(current_phase_1)
+  DXS238XW_SENSOR(current_phase_2)
+  DXS238XW_SENSOR(current_phase_3)
+  DXS238XW_SENSOR(voltage_phase_1)
+  DXS238XW_SENSOR(voltage_phase_2)
+  DXS238XW_SENSOR(voltage_phase_3)
+  DXS238XW_SENSOR(reactive_power_phase_1)
+  DXS238XW_SENSOR(reactive_power_phase_2)
+  DXS238XW_SENSOR(reactive_power_phase_3)
+  DXS238XW_SENSOR(reactive_power_total)
+  DXS238XW_SENSOR(active_power_phase_1)
+  DXS238XW_SENSOR(active_power_phase_2)
+  DXS238XW_SENSOR(active_power_phase_3)
+  DXS238XW_SENSOR(active_power_total)
+  DXS238XW_SENSOR(power_factor_phase_1)
+  DXS238XW_SENSOR(power_factor_phase_2)
+  DXS238XW_SENSOR(power_factor_phase_3)
+  DXS238XW_SENSOR(power_factor_total)
+  DXS238XW_SENSOR(import_active_energy)
+  DXS238XW_SENSOR(export_active_energy)
+  DXS238XW_SENSOR(phase_count)
+  DXS238XW_SENSOR(energy_purchase_balance)
+  DXS238XW_SENSOR(energy_purchase_price)
+  DXS238XW_SENSOR(total_energy)
+  DXS238XW_SENSOR(total_energy_price)
+  DXS238XW_SENSOR(contract_total_energy)
+  DXS238XW_SENSOR(price_kWh)
+
+  DXS238XW_TEXT_SENSOR(meter_state_detail)
+  DXS238XW_TEXT_SENSOR(delay_value_remaining)
+  DXS238XW_TEXT_SENSOR(meter_id)
+
+  DXS238XW_NUMBER(max_current_limit)
+  DXS238XW_NUMBER(max_voltage_limit)
+  DXS238XW_NUMBER(min_voltage_limit)
+  DXS238XW_NUMBER(energy_purchase_value)
+  DXS238XW_NUMBER(energy_purchase_alarm)
+  DXS238XW_NUMBER(delay_value_set)
+  DXS238XW_NUMBER(starting_kWh)
+  DXS238XW_NUMBER(price_kWh)
+
+  DXS238XW_SWITCH(energy_purchase_state)
+  DXS238XW_SWITCH(meter_state)
+  DXS238XW_SWITCH(delay_state)
+
+  DXS238XW_BUTTON(reset_data)
+
+  DXS238XW_BINARY_SENSOR(warning_off_by_over_voltage)
+  DXS238XW_BINARY_SENSOR(warning_off_by_under_voltage)
+  DXS238XW_BINARY_SENSOR(warning_off_by_over_current)
+  DXS238XW_BINARY_SENSOR(warning_off_by_end_purchase)
+  DXS238XW_BINARY_SENSOR(warning_off_by_end_delay)
+  DXS238XW_BINARY_SENSOR(warning_off_by_user)
+  DXS238XW_BINARY_SENSOR(warning_purchase_alarm)
+  DXS238XW_BINARY_SENSOR(meter_state)
+#endif
+
  public:
   Dxs238xwComponent() = default;
 
@@ -363,13 +527,50 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void meter_state_toggle();
   void meter_state_on();
   void meter_state_off();
+
   void hex_message(std::string message, bool check_crc = true);
 
-  void set_switch_value(SmIdEntity entity, bool value);
-  void set_button_value(SmIdEntity entity);
-  void set_number_value(SmIdEntity entity, float value);
+  void process_switch_state(SmIdEntity entity, bool state);
+  void process_button_action(SmIdEntity entity);
+  void process_number_value(SmIdEntity entity, float value);
 
  protected:
+  uint8_t version_msg = 0;
+  bool load_preferences = false;
+
+  bool tuya_ptotocol = false;
+
+  uint8_t index_first_command = 0;
+
+  std::string product_ = "";
+
+  int status_pin_reported_ = -1;
+  int reset_pin_reported_ = -1;
+
+  uint8_t wifi_status_ = -1;
+  uint8_t protocol_version_ = -1;
+
+  optional<InternalGPIOPin *> status_pin_{};
+
+  TuyaInitState init_state_ = TuyaInitState::INIT_HEARTBEAT;
+
+  uint32_t last_command_timestamp_ = 0;
+  uint32_t last_rx_char_timestamp_ = 0;
+
+#ifdef USE_PROTOCOL_HEKR
+  optional<CommandType> expected_confirmation_{};
+  optional<ResponseType> expected_response_{};
+#endif
+
+#ifdef USE_PROTOCOL_TUYA
+  optional<CommandType> expected_response_{};
+
+  std::vector<TuyaDatapoint> datapoints_;
+#endif
+
+  std::vector<uint8_t> rx_message_;
+  std::vector<SmCommand> command_queue_;
+
   LimitAndPurchaseData lp_data_;
   MeterStateData ms_data_;
 
@@ -396,22 +597,48 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  bool first_data_acquisition_();
+  void process_command_queue_();
+  void send_raw_command_(SmCommand command);
 
+  bool validate_message_();
+
+#ifdef USE_PROTOCOL_HEKR
+  void handle_command_(uint8_t command, const uint8_t *buffer, size_t len);
+  void process_and_update_data_(uint8_t command, const uint8_t *buffer);
+#endif
+
+#ifdef USE_PROTOCOL_TUYA
+  void handle_command_(uint8_t command, uint8_t version, const uint8_t *buffer, size_t len);
+  void process_and_update_data_(const uint8_t *buffer, size_t len);
+
+  void set_numeric_datapoint_value_(uint8_t datapoint_id, TuyaDatapointType datapoint_type, uint32_t value, uint8_t length);
+
+  void send_datapoint_command_(uint8_t datapoint_id, TuyaDatapointType datapoint_type, std::vector<uint8_t> data);
+#endif
+
+  void set_boolean_datapoint_value_(uint8_t datapoint_id, bool value);
+  void set_integer_datapoint_value_(uint8_t datapoint_id, uint32_t value);
+  void set_float_datapoint_value_(uint8_t datapoint_id, float value);
+
+  void push_command_(const SmCommand &command, bool push_back = true);
+
+  uint8_t get_wifi_status_code_();
+  void send_wifi_status_();
+
+  bool is_expected_message();
+
+  bool first_data_acquisition_();
+  void show_info_datapoints_();
   void set_meter_state_(bool state);
 
   bool transmit_serial_data_(uint8_t *array, uint8_t size);
-  bool pre_transmit_serial_data_(uint8_t cmd, const uint8_t *array_data = nullptr, uint8_t array_size = 0);
   bool receive_serial_data_(uint8_t *array, uint8_t type_message, uint8_t cmd = 0, uint8_t size_expected = 0);
   bool pre_receive_serial_data_(uint8_t cmd = 0);
 
-  void process_and_update_data_(const uint8_t *receive_array);
-
-  bool send_command_(SmCommandSend cmd, bool state = false, bool process_data = true);
+  bool send_command_(SmCommandSend cmd, bool state = false);
 
   void update_meter_state_detail_();
-
-  bool put_command_data_(uint8_t cmd_send, uint8_t cmd_receive, const uint8_t *array_data = nullptr, uint8_t array_size = 0, bool process_data = true);
+  bool is_message_timeout_();
 
   void incoming_messages_();
 
@@ -424,9 +651,6 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   uint32_t read_initial_number_value_(ESPPreferenceObject &preference, const std::string preference_string, uint32_t default_value);
   void save_initial_number_value_(ESPPreferenceObject &preference, uint32_t value);
-
-  float read_initial_number_value_(ESPPreferenceObject &preference, const std::string preference_string, float default_value);
-  void save_initial_number_value_(ESPPreferenceObject &preference, float value);
 };
 
 }  // namespace dxs238xw

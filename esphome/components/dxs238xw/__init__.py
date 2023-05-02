@@ -5,7 +5,39 @@ import esphome.final_validate as fv
 from esphome import automation
 from esphome.automation import maybe_simple_id
 from esphome.components import uart
-from esphome.const import CONF_ID, CONF_RX_PIN, CONF_TX_PIN, CONF_BAUD_RATE, CONF_NUMBER
+from esphome.const import (
+    CONF_ID,
+    CONF_RX_PIN,
+    CONF_TX_PIN,
+    CONF_BAUD_RATE,
+    CONF_PLATFORM,
+    CONF_NUMBER,
+
+    CONF_MODEL,
+    CONF_PROTOCOL,
+)
+
+from .const import (
+    COMPONENT_NAME,
+
+    CONF_DXS238XW_ID,
+
+    CONF_MESSAGE_VALUE,
+    CONF_CHECK_CRC,
+
+    LIST_SENSOR,
+    MODEL_TYPES,
+    PROTOCOL_TYPES,
+
+    PROTOCOL_TUYA,
+    PROTOCOL_HEKR,
+
+    MODEL_DDS238_2,
+    MODEL_DDS238_4,
+    MODEL_DTS238_7,
+
+    CONF_ENABLE_RAW_MESSAGE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -13,13 +45,12 @@ CODEOWNERS = ["@rodgon81"]
 
 DEPENDENCIES = ["uart"]
 
-CONF_DXS238XW_ID = "dxs238xw_id"
-COMPONENT_NAME = "dxs238xw"
-
 dxs238xw_ns = cg.esphome_ns.namespace(COMPONENT_NAME)
+
 Dxs238xwComponent = dxs238xw_ns.class_(
     "Dxs238xwComponent", cg.PollingComponent, uart.UARTDevice
 )
+
 SmIdEntity = dxs238xw_ns.enum("SmIdEntity", True)
 SmLimitValue = dxs238xw_ns.enum("SmLimitValue")
 
@@ -30,7 +61,12 @@ DXS238XW_COMPONENT_SCHEMA = cv.Schema(
 )
 
 CONFIG_SCHEMA = cv.All(
-    cv.Schema({cv.GenerateID(): cv.declare_id(Dxs238xwComponent)})
+    cv.Schema({
+        cv.GenerateID(): cv.declare_id(Dxs238xwComponent),
+        cv.Required(CONF_MODEL): cv.one_of(*MODEL_TYPES, upper=True),
+        cv.Required(CONF_PROTOCOL): cv.one_of(*PROTOCOL_TYPES, lower=True),
+        cv.Optional(CONF_ENABLE_RAW_MESSAGE, default=False): cv.boolean,
+    })
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(cv.polling_component_schema("3s"))
 )
@@ -122,16 +158,28 @@ def validate_uart(
     )
 
 
-FINAL_VALIDATE_SCHEMA = validate_uart(
-    component=COMPONENT_NAME,
-    tx_pin=1,
-    rx_pin=3,
-    baud_rate=9600,
-    parity="NONE",
-    rx_buffer_size=256,
-    stop_bits=1,
-    data_bits=8,
-)
+def validate_config(config):
+    def raise_error(property: str, component: str, model: str):
+        raise cv.Invalid(
+            f"Property {property} in component {component} in not valid for the model {model}"
+        )
+
+    for component in LIST_SENSOR:
+        platform = fv.full_config.get()[component]
+
+        for n in platform:
+            if n[CONF_PLATFORM] == COMPONENT_NAME:
+                for x in n:
+                    if x == CONF_PLATFORM or x == CONF_DXS238XW_ID:
+                        continue
+
+                    if x not in LIST_SENSOR[component][config[CONF_MODEL]]:
+                        raise_error(x , component, config[CONF_MODEL])
+
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = validate_config
 
 
 async def to_code(config):
@@ -139,6 +187,20 @@ async def to_code(config):
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
 
+    if config[CONF_MODEL] == MODEL_DDS238_2:
+        cg.add_define("USE_MODEL_DDS238_2")
+    elif config[CONF_MODEL] == MODEL_DTS238_7:
+        cg.add_define("USE_MODEL_DTS238_7")
+    else:
+        cg.add_define("USE_MODEL_DDS238_4")
+
+    if config[CONF_PROTOCOL] == PROTOCOL_TUYA:
+        cg.add_define("USE_PROTOCOL_TUYA")
+    else:
+        cg.add_define("USE_PROTOCOL_HEKR")
+
+    if config[CONF_ENABLE_RAW_MESSAGE]:
+        cg.add_define("USE_RAW_MESSAGE")
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -201,9 +263,6 @@ async def meter_state_off_action_to_code(config, action_id, template_arg, args):
 
 HexMessageAction = dxs238xw_ns.class_("HexMessageAction", automation.Action)
 
-MESSAGE_VALUE = "message"
-CHECK_CRC = "check_crc"
-
 
 @automation.register_action(
     "dxs238xw.hex_message",
@@ -211,8 +270,8 @@ CHECK_CRC = "check_crc"
     cv.Schema(
         {
             cv.GenerateID(): cv.use_id(Dxs238xwComponent),
-            cv.Required(MESSAGE_VALUE): cv.templatable(cv.string),
-            cv.Optional(CHECK_CRC, default=True): cv.templatable(cv.boolean),
+            cv.Required(CONF_MESSAGE_VALUE): cv.templatable(cv.string),
+            cv.Optional(CONF_CHECK_CRC, default=True): cv.templatable(cv.boolean),
         }
     ),
 )
@@ -220,10 +279,10 @@ async def hex_message_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     var = cg.new_Pvariable(action_id, template_arg, paren)
 
-    template_message = await cg.templatable(config[MESSAGE_VALUE], args, str)
+    template_message = await cg.templatable(config[CONF_MESSAGE_VALUE], args, str)
     cg.add(var.set_message(template_message))
 
-    template_check_crc = await cg.templatable(config[CHECK_CRC], args, bool)
+    template_check_crc = await cg.templatable(config[CONF_CHECK_CRC], args, bool)
     cg.add(var.set_check_crc(template_check_crc))
 
     return var
