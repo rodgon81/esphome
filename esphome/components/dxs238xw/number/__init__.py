@@ -14,38 +14,50 @@ from esphome.const import (
     UNIT_VOLT,
     UNIT_KILOWATT_HOURS,
     UNIT_MINUTE,
+
+    ICON_CURRENT_AC,
 )
 
-from .. import (
-    dxs238xw_ns,
+from .. import dxs238xw_ns, SmIdEntity, SmLimitValue, DXS238XW_COMPONENT_SCHEMA
+
+from ..const import (
     CONF_DXS238XW_ID,
-    SmIdEntity,
-    SmLimitValue,
-    DXS238XW_COMPONENT_SCHEMA,
+
+    CONF_MAX_CURRENT_LIMIT,
+    CONF_MAX_VOLTAGE_LIMIT,
+    CONF_MIN_VOLTAGE_LIMIT,
+
+    CONF_ENERGY_PURCHASE_VALUE,
+    CONF_ENERGY_PURCHASE_ALARM,
+
+    CONF_DELAY_VALUE_SET,
+
+    CONF_STARTING_KWH,
+    CONF_PRICE_KWH,
+
+    UNIT_CURRENCY_DOLLAR,
+
+    MODE_BOX,
+
+    ICON_SINE_WAVE,
+    ICON_LIGHTNING_BOLT,
+    ICON_TIMER_COG_OUTLINE,
+    ICON_HOME_LIGHTNING_BOLT_OUTLINE,
+    ICON_CASH,
 )
 
 DEPENDENCIES = ["dxs238xw"]
 
 Dxs238xwNumber = dxs238xw_ns.class_("Dxs238xwNumber", number.Number)
 
-MAX_CURRENT_LIMIT = "max_current_limit"
-MAX_VOLTAGE_LIMIT = "max_voltage_limit"
-MIN_VOLTAGE_LIMIT = "min_voltage_limit"
-ENERGY_PURCHASE_VALUE = "energy_purchase_value"
-ENERGY_PURCHASE_ALARM = "energy_purchase_alarm"
-DELAY_VALUE_SET = "delay_value_set"
-STARTING_KWH = "starting_kWh"
-PRICE_KWH = "price_kWh"
-
-UNIT_CURRENCY_DOLLAR = "$"
 
 TYPES = {
-    MAX_CURRENT_LIMIT: (
+    CONF_MAX_CURRENT_LIMIT: (
         number.NUMBER_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(Dxs238xwNumber),
-                cv.Optional(CONF_ICON, default="mdi:current-ac"): cv.icon,
-                cv.Optional(CONF_MODE, default="BOX"): cv.enum(NUMBER_MODES, upper=True),
+                cv.Optional(CONF_ICON, default=ICON_CURRENT_AC): cv.icon,
+                cv.Optional(CONF_MODE, default=MODE_BOX): cv.enum(NUMBER_MODES, upper=True),
                 cv.Optional(
                     CONF_UNIT_OF_MEASUREMENT, default=UNIT_AMPERE
                 ): cv.string_strict,
@@ -59,12 +71,12 @@ TYPES = {
         SmLimitValue.STEP_CURRENT,
         SmIdEntity.NUMBER_MAX_CURRENT_LIMIT,
     ),
-    MAX_VOLTAGE_LIMIT: (
+    CONF_MAX_VOLTAGE_LIMIT: (
         number.NUMBER_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(Dxs238xwNumber),
-                cv.Optional(CONF_ICON, default="mdi:sine-wave"): cv.icon,
-                cv.Optional(CONF_MODE, default="BOX"): cv.enum(NUMBER_MODES, upper=True),
+                cv.Optional(CONF_ICON, default=ICON_SINE_WAVE): cv.icon,
+                cv.Optional(CONF_MODE, default=MODE_BOX): cv.enum(NUMBER_MODES, upper=True),
                 cv.Optional(
                     CONF_UNIT_OF_MEASUREMENT, default=UNIT_VOLT
                 ): cv.string_strict,
@@ -78,12 +90,12 @@ TYPES = {
         SmLimitValue.STEP_VOLTAGE,
         SmIdEntity.NUMBER_MAX_VOLTAGE_LIMIT,
     ),
-    MIN_VOLTAGE_LIMIT: (
+    CONF_MIN_VOLTAGE_LIMIT: (
         number.NUMBER_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(Dxs238xwNumber),
-                cv.Optional(CONF_ICON, default="mdi:sine-wave"): cv.icon,
-                cv.Optional(CONF_MODE, default="BOX"): cv.enum(NUMBER_MODES, upper=True),
+                cv.Optional(CONF_ICON, default=ICON_SINE_WAVE): cv.icon,
+                cv.Optional(CONF_MODE, default=MODE_BOX): cv.enum(NUMBER_MODES, upper=True),
                 cv.Optional(
                     CONF_UNIT_OF_MEASUREMENT, default=UNIT_VOLT
                 ): cv.string_strict,
@@ -97,12 +109,12 @@ TYPES = {
         SmLimitValue.STEP_VOLTAGE,
         SmIdEntity.NUMBER_MIN_VOLTAGE_LIMIT,
     ),
-    ENERGY_PURCHASE_VALUE: (
+    CONF_ENERGY_PURCHASE_VALUE: (
         number.NUMBER_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(Dxs238xwNumber),
-                cv.Optional(CONF_ICON, default="mdi:lightning-bolt"): cv.icon,
-                cv.Optional(CONF_MODE, default="BOX"): cv.enum(NUMBER_MODES, upper=True),
+                cv.Optional(CONF_ICON, default=ICON_LIGHTNING_BOLT): cv.icon,
+                cv.Optional(CONF_MODE, default=MODE_BOX): cv.enum(NUMBER_MODES, upper=True),
                 cv.Optional(
                     CONF_UNIT_OF_MEASUREMENT, default=UNIT_KILOWATT_HOURS
                 ): cv.string_strict,
@@ -116,12 +128,12 @@ TYPES = {
         SmLimitValue.STEP_ENERGY_PURCHASE_VALUE,
         SmIdEntity.NUMBER_ENERGY_PURCHASE_VALUE,
     ),
-    ENERGY_PURCHASE_ALARM: (
+    CONF_ENERGY_PURCHASE_ALARM: (
         number.NUMBER_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(Dxs238xwNumber),
-                cv.Optional(CONF_ICON, default="mdi:lightning-bolt"): cv.icon,
-                cv.Optional(CONF_MODE, default="BOX"): cv.enum(NUMBER_MODES, upper=True),
+                cv.Optional(CONF_ICON, default=ICON_LIGHTNING_BOLT): cv.icon,
+                cv.Optional(CONF_MODE, default=MODE_BOX): cv.enum(NUMBER_MODES, upper=True),
                 cv.Optional(
                     CONF_UNIT_OF_MEASUREMENT, default=UNIT_KILOWATT_HOURS
                 ): cv.string_strict,
@@ -135,12 +147,12 @@ TYPES = {
         SmLimitValue.STEP_ENERGY_PURCHASE_ALARM,
         SmIdEntity.NUMBER_ENERGY_PURCHASE_ALARM,
     ),
-    DELAY_VALUE_SET: (
+    CONF_DELAY_VALUE_SET: (
         number.NUMBER_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(Dxs238xwNumber),
-                cv.Optional(CONF_ICON, default="mdi:timer-cog-outline"): cv.icon,
-                cv.Optional(CONF_MODE, default="BOX"): cv.enum(NUMBER_MODES, upper=True),
+                cv.Optional(CONF_ICON, default=ICON_TIMER_COG_OUTLINE): cv.icon,
+                cv.Optional(CONF_MODE, default=MODE_BOX): cv.enum(NUMBER_MODES, upper=True),
                 cv.Optional(
                     CONF_UNIT_OF_MEASUREMENT, default=UNIT_MINUTE
                 ): cv.string_strict,
@@ -154,12 +166,12 @@ TYPES = {
         SmLimitValue.STEP_DELAY_SET,
         SmIdEntity.NUMBER_DELAY_VALUE_SET,
     ),
-    STARTING_KWH: (
+    CONF_STARTING_KWH: (
         number.NUMBER_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(Dxs238xwNumber),
-                cv.Optional(CONF_ICON, default="mdi:home-lightning-bolt-outline"): cv.icon,
-                cv.Optional(CONF_MODE, default="BOX"): cv.enum(NUMBER_MODES, upper=True),
+                cv.Optional(CONF_ICON, default=ICON_HOME_LIGHTNING_BOLT_OUTLINE): cv.icon,
+                cv.Optional(CONF_MODE, default=MODE_BOX): cv.enum(NUMBER_MODES, upper=True),
                 cv.Optional(
                     CONF_UNIT_OF_MEASUREMENT, default=UNIT_KILOWATT_HOURS
                 ): cv.string_strict,
@@ -173,12 +185,12 @@ TYPES = {
         SmLimitValue.STEP_STARTING_KWH + 0.1,
         SmIdEntity.NUMBER_STARTING_KWH,
     ),
-    PRICE_KWH: (
+    CONF_PRICE_KWH: (
         number.NUMBER_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(Dxs238xwNumber),
-                cv.Optional(CONF_ICON, default="mdi:cash"): cv.icon,
-                cv.Optional(CONF_MODE, default="BOX"): cv.enum(NUMBER_MODES, upper=True),
+                cv.Optional(CONF_ICON, default=ICON_CASH): cv.icon,
+                cv.Optional(CONF_MODE, default=MODE_BOX): cv.enum(NUMBER_MODES, upper=True),
                 cv.Optional(
                     CONF_UNIT_OF_MEASUREMENT, default=UNIT_CURRENCY_DOLLAR
                 ): cv.string_strict,

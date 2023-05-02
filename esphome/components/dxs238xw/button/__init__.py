@@ -8,20 +8,27 @@ from esphome.const import (
     ENTITY_CATEGORY_CONFIG,
 )
 
-from .. import dxs238xw_ns, CONF_DXS238XW_ID, SmIdEntity, DXS238XW_COMPONENT_SCHEMA
+from .. import dxs238xw_ns, SmIdEntity, DXS238XW_COMPONENT_SCHEMA
+
+from ..const import (
+    CONF_DXS238XW_ID,
+
+    CONF_RESET_DATA,
+
+    ICON_BACKUP_RESTORE,
+)
 
 DEPENDENCIES = ["dxs238xw"]
 
 Dxs238xwButton = dxs238xw_ns.class_("Dxs238xwButton", button.Button)
 
-RESET_DATA = "reset_data"
 
 TYPES = {
-    RESET_DATA: (
+    CONF_RESET_DATA: (
         button.BUTTON_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(Dxs238xwButton),
-                cv.Optional(CONF_ICON, default="mdi:backup-restore"): cv.icon,
+                cv.Optional(CONF_ICON, default=ICON_BACKUP_RESTORE): cv.icon,
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,

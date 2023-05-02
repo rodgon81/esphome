@@ -24,50 +24,71 @@ from esphome.const import (
     UNIT_KILOWATT_HOURS,
     ENTITY_CATEGORY_DIAGNOSTIC,
     DEVICE_CLASS_MONETARY,
+
+    CONF_CURRENT,
+    CONF_VOLTAGE,
+    CONF_REACTIVE_POWER,
+    CONF_ACTIVE_POWER,
+    CONF_POWER_FACTOR,
 )
 
-from .. import CONF_DXS238XW_ID, DXS238XW_COMPONENT_SCHEMA
+from .. import DXS238XW_COMPONENT_SCHEMA
+
+from ..const import (
+    CONF_DXS238XW_ID,
+
+    CONF_CURRENT_PHASE_1,
+    CONF_CURRENT_PHASE_2,
+    CONF_CURRENT_PHASE_3,
+
+    CONF_VOLTAGE_PHASE_1,
+    CONF_VOLTAGE_PHASE_2,
+    CONF_VOLTAGE_PHASE_3,
+
+    CONF_REACTIVE_POWER_PHASE_1,
+    CONF_REACTIVE_POWER_PHASE_2,
+    CONF_REACTIVE_POWER_PHASE_3,
+    CONF_REACTIVE_POWER_TOTAL,
+
+    CONF_ACTIVE_POWER_PHASE_1,
+    CONF_ACTIVE_POWER_PHASE_2,
+    CONF_ACTIVE_POWER_PHASE_3,
+    CONF_ACTIVE_POWER_TOTAL,
+
+    CONF_POWER_FACTOR_PHASE_1,
+    CONF_POWER_FACTOR_PHASE_2,
+    CONF_POWER_FACTOR_PHASE_3,
+    CONF_POWER_FACTOR_TOTAL,
+
+    CONF_TOTAL_ENERGY,
+
+    CONF_ENERGY_PURCHASE_BALANCE,
+
+    CONF_PHASE_COUNT,
+
+    CONF_ENERGY_PURCHASE_PRICE,
+    CONF_TOTAL_ENERGY_PRICE,
+    CONF_CONTRACT_TOTAL_ENERGY,
+
+    CONF_PRICE_KWH,
+
+    UNIT_CURRENCY_DOLLAR,
+
+    ICON_ALPHA_F_BOX_OUTLINE,
+    ICON_LIGHTNING_BOLT,
+    ICON_HOME_LIGHTNING_BOLT_OUTLINE,
+)
 
 DEPENDENCIES = ["dxs238xw"]
 
-CONF_CURRENT_PHASE_1 = "current_phase_1"
-CONF_CURRENT_PHASE_2 = "current_phase_2"
-CONF_CURRENT_PHASE_3 = "current_phase_3"
-
-CONF_VOLTAGE_PHASE_1 = "voltage_phase_1"
-CONF_VOLTAGE_PHASE_2 = "voltage_phase_2"
-CONF_VOLTAGE_PHASE_3 = "voltage_phase_3"
-
-CONF_REACTIVE_POWER_TOTAL = "reactive_power_total"
-CONF_REACTIVE_POWER_PHASE_1 = "reactive_power_phase_1"
-CONF_REACTIVE_POWER_PHASE_2 = "reactive_power_phase_2"
-CONF_REACTIVE_POWER_PHASE_3 = "reactive_power_phase_3"
-
-CONF_ACTIVE_POWER_TOTAL = "active_power_total"
-CONF_ACTIVE_POWER_PHASE_1 = "active_power_phase_1"
-CONF_ACTIVE_POWER_PHASE_2 = "active_power_phase_2"
-CONF_ACTIVE_POWER_PHASE_3 = "active_power_phase_3"
-
-CONF_POWER_FACTOR_TOTAL = "power_factor_total"
-CONF_POWER_FACTOR_PHASE_1 = "power_factor_phase_1"
-CONF_POWER_FACTOR_PHASE_2 = "power_factor_phase_2"
-CONF_POWER_FACTOR_PHASE_3 = "power_factor_phase_3"
-
-CONF_TOTAL_ENERGY = "total_energy"
-
-CONF_ENERGY_PURCHASE_BALANCE = "energy_purchase_balance"
-
-CONF_PHASE_COUNT = "phase_count"
-
-CONF_ENERGY_PURCHASE_PRICE = "energy_purchase_price"
-CONF_TOTAL_ENERGY_PRICE = "total_energy_price"
-CONF_CONTRACT_TOTAL_ENERGY = "contract_total_energy"
-
-CONF_PRICE_KWH = "price_kWh"
-
-UNIT_CURRENCY_DOLLAR = "$"
 
 TYPES = {
+    CONF_CURRENT: sensor.sensor_schema(
+        unit_of_measurement=UNIT_AMPERE,
+        accuracy_decimals=3,
+        device_class=DEVICE_CLASS_CURRENT,
+        state_class=STATE_CLASS_MEASUREMENT,
+    ),
     CONF_CURRENT_PHASE_1: sensor.sensor_schema(
         unit_of_measurement=UNIT_AMPERE,
         accuracy_decimals=3,
@@ -84,6 +105,13 @@ TYPES = {
         unit_of_measurement=UNIT_AMPERE,
         accuracy_decimals=3,
         device_class=DEVICE_CLASS_CURRENT,
+        state_class=STATE_CLASS_MEASUREMENT,
+    ),
+
+    CONF_VOLTAGE: sensor.sensor_schema(
+        unit_of_measurement=UNIT_VOLT,
+        accuracy_decimals=1,
+        device_class=DEVICE_CLASS_VOLTAGE,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
     CONF_VOLTAGE_PHASE_1: sensor.sensor_schema(
@@ -104,13 +132,15 @@ TYPES = {
         device_class=DEVICE_CLASS_VOLTAGE,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
+
     CONF_FREQUENCY: sensor.sensor_schema(
         unit_of_measurement=UNIT_HERTZ,
         accuracy_decimals=2,
         device_class=DEVICE_CLASS_FREQUENCY,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
-    CONF_REACTIVE_POWER_TOTAL: sensor.sensor_schema(
+
+    CONF_REACTIVE_POWER: sensor.sensor_schema(
         unit_of_measurement=UNIT_KILOVOLT_AMPS_REACTIVE,
         accuracy_decimals=3,
         device_class=DEVICE_CLASS_REACTIVE_POWER,
@@ -134,7 +164,14 @@ TYPES = {
         device_class=DEVICE_CLASS_REACTIVE_POWER,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
-    CONF_ACTIVE_POWER_TOTAL: sensor.sensor_schema(
+    CONF_REACTIVE_POWER_TOTAL: sensor.sensor_schema(
+        unit_of_measurement=UNIT_KILOVOLT_AMPS_REACTIVE,
+        accuracy_decimals=3,
+        device_class=DEVICE_CLASS_REACTIVE_POWER,
+        state_class=STATE_CLASS_MEASUREMENT,
+    ),
+
+    CONF_ACTIVE_POWER: sensor.sensor_schema(
         unit_of_measurement=UNIT_KILOWATT,
         accuracy_decimals=3,
         device_class=DEVICE_CLASS_POWER,
@@ -158,7 +195,14 @@ TYPES = {
         device_class=DEVICE_CLASS_POWER,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
-    CONF_POWER_FACTOR_TOTAL: sensor.sensor_schema(
+    CONF_ACTIVE_POWER_TOTAL: sensor.sensor_schema(
+        unit_of_measurement=UNIT_KILOWATT,
+        accuracy_decimals=3,
+        device_class=DEVICE_CLASS_POWER,
+        state_class=STATE_CLASS_MEASUREMENT,
+    ),
+
+    CONF_POWER_FACTOR: sensor.sensor_schema(
         accuracy_decimals=2,
         device_class=DEVICE_CLASS_POWER_FACTOR,
         state_class=STATE_CLASS_MEASUREMENT,
@@ -178,6 +222,13 @@ TYPES = {
         device_class=DEVICE_CLASS_POWER_FACTOR,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
+    CONF_POWER_FACTOR_TOTAL: sensor.sensor_schema(
+        accuracy_decimals=2,
+        device_class=DEVICE_CLASS_POWER_FACTOR,
+        state_class=STATE_CLASS_MEASUREMENT,
+    ),
+
+
     CONF_IMPORT_ACTIVE_ENERGY: sensor.sensor_schema(
         unit_of_measurement=UNIT_KILOWATT_HOURS,
         accuracy_decimals=2,
@@ -196,21 +247,24 @@ TYPES = {
         device_class=DEVICE_CLASS_ENERGY,
         state_class=STATE_CLASS_TOTAL,
     ),
-    CONF_ENERGY_PURCHASE_BALANCE: sensor.sensor_schema(
-        unit_of_measurement=UNIT_KILOWATT_HOURS,
-        icon="mdi:lightning-bolt",
-        accuracy_decimals=2,
-    ),
+
     CONF_PHASE_COUNT: sensor.sensor_schema(
         entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
-        icon="mdi:alpha-f-box-outline",
+        icon=ICON_ALPHA_F_BOX_OUTLINE,
         accuracy_decimals=0,
+    ),
+
+    CONF_ENERGY_PURCHASE_BALANCE: sensor.sensor_schema(
+        unit_of_measurement=UNIT_KILOWATT_HOURS,
+        icon=ICON_LIGHTNING_BOLT,
+        accuracy_decimals=2,
     ),
     CONF_ENERGY_PURCHASE_PRICE: sensor.sensor_schema(
         unit_of_measurement=UNIT_CURRENCY_DOLLAR,
         accuracy_decimals=2,
         device_class=DEVICE_CLASS_MONETARY,
     ),
+
     CONF_TOTAL_ENERGY_PRICE: sensor.sensor_schema(
         unit_of_measurement=UNIT_CURRENCY_DOLLAR,
         accuracy_decimals=2,
@@ -218,7 +272,7 @@ TYPES = {
     ),
     CONF_CONTRACT_TOTAL_ENERGY: sensor.sensor_schema(
         unit_of_measurement=UNIT_KILOWATT_HOURS,
-        icon="mdi:home-lightning-bolt-outline",
+        icon=ICON_HOME_LIGHTNING_BOLT_OUTLINE,
         accuracy_decimals=2,
         device_class=DEVICE_CLASS_ENERGY,
         state_class=STATE_CLASS_TOTAL,

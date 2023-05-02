@@ -6,23 +6,32 @@ from esphome.const import (
     ENTITY_CATEGORY_DIAGNOSTIC,
 )
 
-from .. import CONF_DXS238XW_ID, DXS238XW_COMPONENT_SCHEMA
+from .. import DXS238XW_COMPONENT_SCHEMA
+
+from ..const import (
+    CONF_DXS238XW_ID,
+
+    CONF_METER_STATE_DETAIL,
+    CONF_DELAY_VALUE_REMAINING,
+    CONF_METER_ID,
+
+    ICON_POWER_PLUG,
+    ICON_TIMER_COG_OUTLINE,
+    ICON_ALPHA_S_BOX_OUTLINE,
+)
 
 DEPENDENCIES = ["dxs238xw"]
 
-CONF_METER_STATE_DETAIL = "meter_state_detail"
-CONF_DELAY_VALUE_REMAINING = "delay_value_remaining"
-CONF_METER_ID = "meter_id"
 
 TYPES = {
     CONF_METER_STATE_DETAIL: text_sensor.text_sensor_schema(
-        icon="mdi:power-plug",
+        icon=ICON_POWER_PLUG,
     ),
     CONF_DELAY_VALUE_REMAINING: text_sensor.text_sensor_schema(
-        icon="mdi:timer-cog-outline",
+        icon=ICON_TIMER_COG_OUTLINE,
     ),
     CONF_METER_ID: text_sensor.text_sensor_schema(
-        icon="mdi:alpha-s-box-outline",
+        icon=ICON_ALPHA_S_BOX_OUTLINE,
         entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
     ),
 }

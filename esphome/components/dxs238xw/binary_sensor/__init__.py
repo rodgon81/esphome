@@ -8,18 +8,22 @@ from esphome.const import (
     DEVICE_CLASS_POWER,
 )
 
-from .. import CONF_DXS238XW_ID, DXS238XW_COMPONENT_SCHEMA
+from .. import DXS238XW_COMPONENT_SCHEMA
+
+from ..const import (
+    CONF_DXS238XW_ID,
+
+    CONF_WARNING_OFF_BY_OVER_VOLTAGE,
+    CONF_WARNING_OFF_BY_UNDER_VOLTAGE,
+    CONF_WARNING_OFF_BY_OVER_CURRENT,
+    CONF_WARNING_OFF_BY_END_PURCHASE,
+    CONF_WARNING_OFF_BY_END_DELAY,
+    CONF_WARNING_OFF_BY_USER,
+    CONF_WARNING_PURCHASE_ALARM,
+    CONF_METER_STATE,
+)
 
 DEPENDENCIES = ["dxs238xw"]
-
-CONF_WARNING_OFF_BY_OVER_VOLTAGE = "warning_off_by_over_voltage"
-CONF_WARNING_OFF_BY_UNDER_VOLTAGE = "warning_off_by_under_voltage"
-CONF_WARNING_OFF_BY_OVER_CURRENT = "warning_off_by_over_current"
-CONF_WARNING_OFF_BY_END_PURCHASE = "warning_off_by_end_purchase"
-CONF_WARNING_OFF_BY_END_DELAY = "warning_off_by_end_delay"
-CONF_WARNING_OFF_BY_USER = "warning_off_by_user"
-CONF_WARNING_PURCHASE_ALARM = "warning_purchase_alarm"
-CONF_METER_STATE = "meter_state"
 
 
 TYPES = {
