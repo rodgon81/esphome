@@ -2,6 +2,8 @@
 
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/application.h"
+#include "esphome/components/network/util.h"
+#include "esphome/core/util.h"
 
 namespace esphome {
 namespace dxs238xw {
@@ -19,6 +21,24 @@ namespace dxs238xw {
   std::vector<uint8_t> {}
 
 static const char *const SM_STR_COMPONENT_VERSION = "2.0.0000 beta";
+
+#ifdef USE_MODEL_DDS238_2
+static const char *const SM_STR_METER_MODEL = "DDS238_2";
+#endif
+#ifdef USE_MODEL_DDS238_4
+static const char *const SM_STR_METER_MODEL = "DDS238_4";
+#endif
+#ifdef USE_MODEL_DTS238_7
+static const char *const SM_STR_METER_MODEL = "DTS238_7";
+#endif
+
+#ifdef USE_PROTOCOL_HEKR
+static const char *const SM_STR_PROTOCOL = "Hekr";
+#endif
+
+#ifdef USE_PROTOCOL_TUYA
+static const char *const SM_STR_PROTOCOL = "Tuya";
+#endif
 
 //------------------------------------------------------------------------------
 // DEFAULTS
@@ -528,20 +548,33 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void meter_state_on();
   void meter_state_off();
 
-  void hex_message(std::string message, bool check_crc = true);
+  void hex_message(std::string message, bool check_crc);
 
   void process_switch_state(SmIdEntity entity, bool state);
   void process_button_action(SmIdEntity entity);
   void process_number_value(SmIdEntity entity, float value);
 
  protected:
-  uint8_t version_msg = 0;
   bool load_preferences = false;
 
-  bool tuya_ptotocol = false;
-
+  uint32_t postpone_setup_time_ = 0;
   uint8_t index_first_command = 0;
 
+  TuyaInitState init_state_ = TuyaInitState::INIT_HEARTBEAT;
+
+  uint32_t last_command_timestamp_ = 0;
+  uint32_t last_rx_char_timestamp_ = 0;
+
+  uint32_t count_error_data_acquisition_ = 0;
+
+#ifdef USE_PROTOCOL_HEKR
+  uint8_t version_msg = 0;
+
+  optional<CommandType> expected_confirmation_{};
+  optional<ResponseType> expected_response_{};
+#endif
+
+#ifdef USE_PROTOCOL_TUYA
   std::string product_ = "";
 
   int status_pin_reported_ = -1;
@@ -552,17 +585,6 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   optional<InternalGPIOPin *> status_pin_{};
 
-  TuyaInitState init_state_ = TuyaInitState::INIT_HEARTBEAT;
-
-  uint32_t last_command_timestamp_ = 0;
-  uint32_t last_rx_char_timestamp_ = 0;
-
-#ifdef USE_PROTOCOL_HEKR
-  optional<CommandType> expected_confirmation_{};
-  optional<ResponseType> expected_response_{};
-#endif
-
-#ifdef USE_PROTOCOL_TUYA
   optional<CommandType> expected_response_{};
 
   std::vector<TuyaDatapoint> datapoints_;
@@ -573,8 +595,6 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   LimitAndPurchaseData lp_data_;
   MeterStateData ms_data_;
-
-  uint32_t count_error_data_acquisition_ = 0;
 
   uint32_t hash_delay_value_set_ = fnv1_hash(SM_STR_DELAY_VALUE_SET);
   uint32_t hash_starting_kWh_ = fnv1_hash(SM_STR_STARTING_KWH);
@@ -590,10 +610,6 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   SmErrorType error_type_ = SmErrorType::NO_ERROR;
   SmErrorCode error_code_ = SmErrorCode::NO_ERROR;
-
-  uint8_t receive_array_[SM_MAX_BYTE_MSG_BUFFER];
-
-  uint32_t postpone_setup_time_ = 0;
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -614,26 +630,29 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void set_numeric_datapoint_value_(uint8_t datapoint_id, TuyaDatapointType datapoint_type, uint32_t value, uint8_t length);
 
   void send_datapoint_command_(uint8_t datapoint_id, TuyaDatapointType datapoint_type, std::vector<uint8_t> data);
-#endif
 
   void set_boolean_datapoint_value_(uint8_t datapoint_id, bool value);
   void set_integer_datapoint_value_(uint8_t datapoint_id, uint32_t value);
-  void set_float_datapoint_value_(uint8_t datapoint_id, float value);
-
-  void push_command_(const SmCommand &command, bool push_back = true);
 
   uint8_t get_wifi_status_code_();
   void send_wifi_status_();
 
+  void show_info_datapoints_();
+#endif
+
+#ifdef USE_RAW_MESSAGE
+  void hex_message(std::string message, bool check_crc = true);
+  bool transmit_serial_data_(uint8_t *array, uint8_t size);
+  bool receive_serial_data_(uint8_t *array, uint8_t type_message, uint8_t cmd = 0, uint8_t size_expected = 0);
+#endif
+
+  void push_command_(const SmCommand &command, bool push_back = true);
+
   bool is_expected_message();
 
   bool first_data_acquisition_();
-  void show_info_datapoints_();
-  void set_meter_state_(bool state);
 
-  bool transmit_serial_data_(uint8_t *array, uint8_t size);
-  bool receive_serial_data_(uint8_t *array, uint8_t type_message, uint8_t cmd = 0, uint8_t size_expected = 0);
-  bool pre_receive_serial_data_(uint8_t cmd = 0);
+  void set_meter_state_(bool state);
 
   bool send_command_(SmCommandSend cmd, bool state = false);
 

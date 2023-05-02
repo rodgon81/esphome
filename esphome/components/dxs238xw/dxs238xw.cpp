@@ -1,6 +1,4 @@
 #include "dxs238xw.h"
-#include "esphome/components/network/util.h"
-#include "esphome/core/util.h"
 
 namespace esphome {
 namespace dxs238xw {
@@ -142,6 +140,16 @@ void Dxs238xwComponent::setup() {
       ESP_LOGI(TAG, "In --- setup");
 
       ESP_LOGI(TAG, "* Get Initial Values");
+#ifdef USE_MODEL_DDS238_2
+      LOAD_PREFERENCE_MS(starting_kWh, SM_STR_STARTING_KWH, SmLimitValue::MIN_STARTING_KWH)
+      LOAD_PREFERENCE_MS(price_kWh, SM_STR_PRICE_KWH, SmLimitValue::MIN_PRICE_KWH)
+
+      UPDATE_NUMBER(starting_kWh, this->ms_data_.starting_kWh * 0.1)
+      UPDATE_NUMBER(price_kWh, this->ms_data_.price_kWh * 0.1)
+      UPDATE_SENSOR(price_kWh, this->ms_data_.price_kWh * 0.1)
+#endif
+
+#ifdef USE_MODEL_DDS238_4
       LOAD_PREFERENCE_MS(delay_value_set, SM_STR_DELAY_VALUE_SET, SmLimitValue::MAX_DELAY_SET)
       LOAD_PREFERENCE_MS(starting_kWh, SM_STR_STARTING_KWH, SmLimitValue::MIN_STARTING_KWH)
       LOAD_PREFERENCE_MS(price_kWh, SM_STR_PRICE_KWH, SmLimitValue::MIN_PRICE_KWH)
@@ -154,6 +162,22 @@ void Dxs238xwComponent::setup() {
       UPDATE_SENSOR(price_kWh, this->ms_data_.price_kWh * 0.1)
       UPDATE_NUMBER(energy_purchase_value, this->lp_data_.energy_purchase_value)
       UPDATE_NUMBER(energy_purchase_alarm, this->lp_data_.energy_purchase_alarm)
+#endif
+
+#ifdef USE_MODEL_DTS238_7
+      LOAD_PREFERENCE_MS(delay_value_set, SM_STR_DELAY_VALUE_SET, SmLimitValue::MAX_DELAY_SET)
+      LOAD_PREFERENCE_MS(starting_kWh, SM_STR_STARTING_KWH, SmLimitValue::MIN_STARTING_KWH)
+      LOAD_PREFERENCE_MS(price_kWh, SM_STR_PRICE_KWH, SmLimitValue::MIN_PRICE_KWH)
+      LOAD_PREFERENCE_LP(energy_purchase_value, SM_STR_ENERGY_PURCHASE_VALUE, SmLimitValue::MIN_ENERGY_PURCHASE_VALUE)
+      LOAD_PREFERENCE_LP(energy_purchase_alarm, SM_STR_ENERGY_PURCHASE_ALARM, SmLimitValue::MIN_ENERGY_PURCHASE_ALARM)
+
+      UPDATE_NUMBER(delay_value_set, this->ms_data_.delay_value_set)
+      UPDATE_NUMBER(starting_kWh, this->ms_data_.starting_kWh * 0.1)
+      UPDATE_NUMBER(price_kWh, this->ms_data_.price_kWh * 0.1)
+      UPDATE_SENSOR(price_kWh, this->ms_data_.price_kWh * 0.1)
+      UPDATE_NUMBER(energy_purchase_value, this->lp_data_.energy_purchase_value)
+      UPDATE_NUMBER(energy_purchase_alarm, this->lp_data_.energy_purchase_alarm)
+#endif
 
       this->load_preferences = false;
     }
@@ -217,6 +241,8 @@ void Dxs238xwComponent::update() {
 void Dxs238xwComponent::dump_config() {
   LOG_UPDATE_INTERVAL(this)
   ESP_LOGCONFIG(TAG, "*** COMPONENT VERSION: %s ***", SM_STR_COMPONENT_VERSION);
+  ESP_LOGCONFIG(TAG, "*** Meter Model: %s ***", SM_STR_METER_MODEL);
+  ESP_LOGCONFIG(TAG, "*** Protocol: %s ***", SM_STR_PROTOCOL);
 }
 
 //------------------------------------------------------------------------------
@@ -416,7 +442,6 @@ bool Dxs238xwComponent::validate_message_() {
 }
 
 #ifdef USE_PROTOCOL_HEKR
-
 void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, size_t len) {
   if (this->expected_confirmation_.has_value() && (this->expected_confirmation_ == (CommandType) command)) {
     ESP_LOGV(TAG, "Confirmacion recibida");
@@ -683,7 +708,6 @@ void Dxs238xwComponent::process_and_update_data_(uint8_t command, const uint8_t 
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
-
 void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const uint8_t *buffer, size_t len) {
   CommandType command_type = (CommandType) command;
 
@@ -1220,6 +1244,7 @@ void Dxs238xwComponent::push_command_(const SmCommand &command, bool push_back) 
       if (index == 0) {
         if (this->is_expected_message()) {
           // comprobamos si se estan adjuntando datos, si no descartamos el mensaje
+          // comprobar el largo del payload y los datos TODO
           if (!command.payload.empty()) {
             cmd = command;
 
@@ -1398,7 +1423,6 @@ void Dxs238xwComponent::process_switch_state(SmIdEntity entity, bool state) {
         this->send_command_(SmCommandSend::SET_POWER_STATE, state);
 
         UPDATE_SWITCH_FORCE(meter_state, state)
-
         break;
       }
       case SmIdEntity::SWITCH_DELAY_STATE: {
@@ -1573,12 +1597,19 @@ void Dxs238xwComponent::set_meter_state_(bool state) {
   this->send_command_(SmCommandSend::SET_POWER_STATE, state);
 }
 
+void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
+//
+#ifdef USE_RAW_MESSAGE
+  this->hex_message_(message, check_crc);
+#endif
+}
+
 //------------------------------------------------------------------------------
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 
 #ifdef USE_RAW_MESSAGE
-void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
+void Dxs238xwComponent::hex_message_(std::string message, bool check_crc) {
   ESP_LOGD(TAG, "In --- send_hex_message");
 
   ESP_LOGD(TAG, "* message in = %s", message.c_str());
@@ -1655,10 +1686,12 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
           if (this->transmit_serial_data_(send_array, length_array)) {
             ESP_LOGD(TAG, "* Waiting answer:");
 
-            if (this->receive_serial_data_(this->receive_array_, HEKR_TYPE_RECEIVE)) {
-              ESP_LOGD(TAG, "* Successful answer: %s", format_hex_pretty(this->receive_array_, this->receive_array_[1]).c_str());
+            uint8_t receive_array_[SM_MAX_BYTE_MSG_BUFFER];
 
-              // this->process_and_update_data_(this->receive_array_[4], this->receive_array_);
+            if (this->receive_serial_data_(receive_array_, HEKR_TYPE_RECEIVE)) {
+              ESP_LOGD(TAG, "* Successful answer: %s", format_hex_pretty(receive_array_, receive_array_[1]).c_str());
+
+              // this->process_and_update_data_(receive_array_[4], receive_array_);
 
               ESP_LOGD(TAG, "Out --- send_hex_message");
 
