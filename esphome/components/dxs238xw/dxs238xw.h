@@ -17,9 +17,6 @@ namespace dxs238xw {
 
 // #define USE_RAW_MESSAGE
 
-#define EMPTY_DATA \
-  std::vector<uint8_t> {}
-
 static const char *const SM_STR_COMPONENT_VERSION = "2.0.0000 beta";
 
 #ifdef USE_MODEL_DDS238_2
@@ -153,19 +150,6 @@ enum class SmIdEntity : uint8_t {
   BUTTON_RESET_DATA = 31,
 };
 
-enum class SmCommandSend : uint8_t {
-  GET_POWER_STATE,
-  GET_MEASUREMENT_DATA,
-  GET_LIMIT_AND_PURCHASE_DATA,
-  GET_METER_ID,
-
-  SET_LIMIT_DATA,
-  SET_PURCHASE_DATA,
-  SET_POWER_STATE,
-  SET_DELAY,
-  SET_RESET,
-};
-
 enum class SmErrorType : uint8_t {
   NO_ERROR,
   COMMUNICATION_CONFIRMATION,
@@ -228,15 +212,16 @@ enum class ResponseType : uint8_t {
 };
 
 enum class CommandType : uint8_t {
-  HEKR_CMD_SEND_SET_LIMIT = 0x03,
-  HEKR_CMD_SEND_SET_PURCHASE = 0x0D,
-  HEKR_CMD_SEND_SET_METER_STATE = 0x09,
-  HEKR_CMD_SEND_SET_DELAY = 0x0C,
-  HEKR_CMD_SEND_SET_RESET = 0x05,
-  HEKR_CMD_SEND_GET_METER_STATE = 0x00,
-  HEKR_CMD_SEND_GET_MEASUREMENT = 0x0A,
-  HEKR_CMD_SEND_GET_LIMIT_AND_PURCHASE = 0x02,
-  HEKR_CMD_SEND_GET_METER_ID = 0x06,
+  GET_METER_STATE = 0x00,
+  GET_MEASUREMENT = 0x0A,
+  GET_LIMIT_AND_PURCHASE = 0x02,
+  GET_METER_ID = 0x06,
+
+  SET_LIMIT = 0x03,
+  SET_PURCHASE = 0x0D,
+  SET_METER_STATE = 0x09,
+  SET_DELAY = 0x0C,
+  SET_RESET = 0x05,
 };
 #endif
 
@@ -256,6 +241,49 @@ enum class CommandType : uint8_t {
   WIFI_RSSI = 0x24,
   VACUUM_MAP_UPLOAD = 0x28,
   GET_NETWORK_STATUS = 0x2B,
+};
+
+enum class Datapoint_number : uint8_t {
+  FREQUENCY = 0,
+  CURRENT = 0,
+  CURRENT_PHASE_1 = 0,
+  CURRENT_PHASE_2 = 0,
+  CURRENT_PHASE_3 = 0,
+  VOLTAGE = 0,
+  VOLTAGE_PHASE_1 = 0,
+  VOLTAGE_PHASE_2 = 0,
+  VOLTAGE_PHASE_3 = 0,
+  REACTIVE_POWER = 0,
+  REACTIVE_POWER_PHASE_1 = 0,
+  REACTIVE_POWER_PHASE_2 = 0,
+  REACTIVE_POWER_PHASE_3 = 0,
+  REACTIVE_POWER_TOTAL = 0,
+  ACTIVE_POWER = 0,
+  ACTIVE_POWER_PHASE_1 = 0,
+  ACTIVE_POWER_PHASE_2 = 0,
+  ACTIVE_POWER_PHASE_3 = 0,
+  ACTIVE_POWER_TOTAL = 0,
+  POWER_FACTOR = 0,
+  POWER_FACTOR_PHASE_1 = 0,
+  POWER_FACTOR_PHASE_2 = 0,
+  POWER_FACTOR_PHASE_3 = 0,
+  POWER_FACTOR_TOTAL = 0,
+  IMPORT_ACTIVE_ENERGY = 0,
+  EXPORT_ACTIVE_ENERGY = 0,
+  PHASE_COUNT = 0,
+  ENERGY_PURCHASE_BALANCE = 0,
+  TOTAL_ENERGY = 0,
+  DELAY_VALUE_REMAINING = 0,
+  MAX_CURRENT_LIMIT = 0,
+  MAX_VOLTAGE_LIMIT = 0,
+  MIN_VOLTAGE_LIMIT = 0,
+  ENERGY_PURCHASE_VALUE = 0,
+  ENERGY_PURCHASE_ALARM = 0,
+  DELAY_VALUE_SET = 0,
+  ENERGY_PURCHASE_STATE = 0,
+  METER_STATE = 0,
+  DELAY_STATE = 0,
+  RESET_DATA = 0,
 };
 
 enum class TuyaDatapointType : uint8_t {
@@ -287,7 +315,7 @@ struct TuyaDatapoint {
 
 struct SmCommand {
   CommandType cmd;
-  std::vector<uint8_t> payload;
+  std::vector<uint8_t> payload = std::vector<uint8_t>{};
   bool null_old_response = false;
 };
 
@@ -654,7 +682,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   void set_meter_state_(bool state);
 
-  bool send_command_(SmCommandSend cmd, bool state = false);
+  bool send_command_(CommandType cmd, bool state = false);
 
   void update_meter_state_detail_();
   bool is_message_timeout_();

@@ -208,14 +208,14 @@ void Dxs238xwComponent::setup() {
 #ifdef USE_PROTOCOL_HEKR
     this->set_interval("get_data", SM_MIN_INTERVAL_TO_GET_DATA, [this] {
       if (this->get_component_state() == COMPONENT_STATE_LOOP) {
-        this->send_command_(SmCommandSend::GET_POWER_STATE);
-        this->send_command_(SmCommandSend::GET_LIMIT_AND_PURCHASE_DATA);
+        this->send_command_(CommandType::GET_METER_STATE);
+        this->send_command_(CommandType::GET_LIMIT_AND_PURCHASE);
       }
     });
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
-    this->set_interval("heartbeat", 15000, [this] { this->push_command_(SmCommand{.cmd = CommandType::HEARTBEAT, .payload = EMPTY_DATA}); });
+    this->set_interval("heartbeat", 1000, [this] { this->push_command_(SmCommand{.cmd = CommandType::HEARTBEAT}); });
 #endif
 
     this->set_interval("log_command_queue", 2000, [this] { ESP_LOGI(TAG, "Comandos en cola %u", this->command_queue_.size()); });
@@ -233,7 +233,7 @@ void Dxs238xwComponent::loop() {
 void Dxs238xwComponent::update() {
 #ifdef USE_PROTOCOL_HEKR
   if (this->get_component_state() == COMPONENT_STATE_LOOP) {
-    this->send_command_(SmCommandSend::GET_MEASUREMENT_DATA);
+    this->send_command_(CommandType::GET_MEASUREMENT);
   }
 #endif
 }
@@ -254,22 +254,22 @@ bool Dxs238xwComponent::first_data_acquisition_() {
 #ifdef USE_PROTOCOL_HEKR
     case 0:
       ESP_LOGI(TAG, "* Try to load GET_METER_ID");
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_GET_METER_ID, .payload = EMPTY_DATA});
+      this->send_command_(CommandType::GET_METER_ID);
 
       break;
     case 1:
-      ESP_LOGI(TAG, "* Try to load GET_POWER_STATE");
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_GET_METER_STATE, .payload = EMPTY_DATA});
+      ESP_LOGI(TAG, "* Try to load GET_METER_STATE");
+      this->send_command_(CommandType::GET_METER_STATE);
 
       break;
     case 2:
-      ESP_LOGI(TAG, "* Try to load GET_LIMIT_AND_PURCHASE_DATA");
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_GET_LIMIT_AND_PURCHASE, .payload = EMPTY_DATA});
+      ESP_LOGI(TAG, "* Try to load GET_LIMIT_AND_PURCHASE");
+      this->send_command_(CommandType::GET_LIMIT_AND_PURCHASE);
 
       break;
     case 3:
-      ESP_LOGI(TAG, "* Try to load GET_MEASUREMENT_DATA");
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_GET_MEASUREMENT, .payload = EMPTY_DATA});
+      ESP_LOGI(TAG, "* Try to load GET_MEASUREMENT");
+      this->send_command_(CommandType::GET_MEASUREMENT);
 
       break;
 #endif
@@ -449,21 +449,21 @@ void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, 
     this->expected_confirmation_.reset();
 
     switch ((CommandType) command) {
-      case CommandType::HEKR_CMD_SEND_GET_METER_STATE:
-      case CommandType::HEKR_CMD_SEND_SET_METER_STATE:
-      case CommandType::HEKR_CMD_SEND_SET_DELAY:
+      case CommandType::GET_METER_STATE:
+      case CommandType::SET_METER_STATE:
+      case CommandType::SET_DELAY:
         this->expected_response_ = ResponseType::HEKR_CMD_RECEIVE_METER_STATE;
         break;
-      case CommandType::HEKR_CMD_SEND_GET_MEASUREMENT:
-      case CommandType::HEKR_CMD_SEND_SET_RESET:
+      case CommandType::GET_MEASUREMENT:
+      case CommandType::SET_RESET:
         this->expected_response_ = ResponseType::HEKR_CMD_RECEIVE_MEASUREMENT;
         break;
-      case CommandType::HEKR_CMD_SEND_GET_LIMIT_AND_PURCHASE:
-      case CommandType::HEKR_CMD_SEND_SET_LIMIT:
-      case CommandType::HEKR_CMD_SEND_SET_PURCHASE:
+      case CommandType::GET_LIMIT_AND_PURCHASE:
+      case CommandType::SET_LIMIT:
+      case CommandType::SET_PURCHASE:
         this->expected_response_ = ResponseType::HEKR_CMD_RECEIVE_LIMIT_AND_PURCHASE;
         break;
-      case CommandType::HEKR_CMD_SEND_GET_METER_ID:
+      case CommandType::GET_METER_ID:
         this->expected_response_ = ResponseType::HEKR_CMD_RECEIVE_METER_ID;
         break;
       default:
@@ -541,7 +541,7 @@ void Dxs238xwComponent::process_and_update_data_(uint8_t command, const uint8_t 
       if (this->ms_data_.warning_off_by_end_delay && this->ms_data_.meter_state) {
         ESP_LOGD(TAG, "* End Delay, trying to set Power State to off");
         // REVISAR COMO NO PROCESAR LOS DATOS
-        if (this->send_command_(SmCommandSend::SET_POWER_STATE, false)) {
+        if (this->send_command_(CommandType::SET_METER_STATE, false)) {
           this->ms_data_.meter_state = buffer[6];
         }
 
@@ -551,7 +551,7 @@ void Dxs238xwComponent::process_and_update_data_(uint8_t command, const uint8_t 
       if ((this->ms_data_.warning_off_by_end_delay && this->ms_data_.delay_state) || (this->get_component_state() == COMPONENT_STATE_SETUP && this->ms_data_.delay_state)) {
         ESP_LOGD(TAG, "* End Delay, trying to set Delay State to off");
         // REVISAR COMO NO PROCESAR LOS DATOS
-        if (this->send_command_(SmCommandSend::SET_DELAY, false)) {
+        if (this->send_command_(CommandType::SET_DELAY, false)) {
           this->ms_data_.delay_state = buffer[18];
         }
 
@@ -733,7 +733,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       if (this->init_state_ == TuyaInitState::INIT_HEARTBEAT) {
         this->init_state_ = TuyaInitState::INIT_PRODUCT;
 
-        this->push_command_(SmCommand{.cmd = CommandType::PRODUCT_QUERY, .payload = EMPTY_DATA});
+        this->push_command_(SmCommand{.cmd = CommandType::PRODUCT_QUERY});
       }
 
       break;
@@ -756,7 +756,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
 
       if (this->init_state_ == TuyaInitState::INIT_PRODUCT) {
         this->init_state_ = TuyaInitState::INIT_CONF;
-        this->push_command_(SmCommand{.cmd = CommandType::CONF_QUERY, .payload = EMPTY_DATA});
+        this->push_command_(SmCommand{.cmd = CommandType::CONF_QUERY});
       }
 
       break;
@@ -771,7 +771,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
         // If mcu returned status gpio, then we can omit sending wifi state
         if (this->status_pin_reported_ != -1) {
           this->init_state_ = TuyaInitState::INIT_DATAPOINT;
-          this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY, .payload = EMPTY_DATA});
+          this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY});
 
           bool is_pin_equals = this->status_pin_.has_value() && (this->status_pin_.value()->get_pin() == this->status_pin_reported_);
 
@@ -800,7 +800,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
     case CommandType::WIFI_STATE:
       if (this->init_state_ == TuyaInitState::INIT_WIFI) {
         this->init_state_ = TuyaInitState::INIT_DATAPOINT;
-        this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY, .payload = EMPTY_DATA});
+        this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY});
       }
 
       break;
@@ -961,7 +961,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
     }
 
     switch (datapoint.id) {
-      case DATAPOINT_SWITCH_ENERGY_PURCHASE_STATE:
+      case Datapoint_number::FREQUENCY:
         ESP_LOGV(TAG, "MCU reported switch %u is: %s", DATAPOINT_SWITCH_ENERGY_PURCHASE_STATE, ONOFF(datapoint.value_bool));
 
         UPDATE_SWITCH(delay_state, datapoint.value_bool)
@@ -1274,38 +1274,38 @@ void Dxs238xwComponent::push_command_(const SmCommand &command, bool push_back) 
   }
 }
 
-bool Dxs238xwComponent::send_command_(SmCommandSend cmd, bool state) {
+bool Dxs238xwComponent::send_command_(CommandType cmd, bool state) {
   switch (cmd) {
-    case SmCommandSend::GET_POWER_STATE: {
-      ESP_LOGV(TAG, "Push Command - GET_POWER_STATE");
+    case CommandType::GET_METER_STATE: {
+      ESP_LOGV(TAG, "Push Command - GET_METER_STATE");
 
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_GET_METER_STATE, .payload = EMPTY_DATA});
-
-      break;
-    }
-    case SmCommandSend::GET_MEASUREMENT_DATA: {
-      ESP_LOGV(TAG, "Push Command - GET_MEASUREMENT_DATA");
-
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_GET_MEASUREMENT, .payload = EMPTY_DATA});
+      this->push_command_(SmCommand{.cmd = CommandType::GET_METER_STATE});
 
       break;
     }
-    case SmCommandSend::GET_LIMIT_AND_PURCHASE_DATA: {
-      ESP_LOGV(TAG, "Push Command - GET_LIMIT_AND_PURCHASE_DATA");
+    case CommandType::GET_MEASUREMENT: {
+      ESP_LOGV(TAG, "Push Command - GET_MEASUREMENT");
 
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_GET_LIMIT_AND_PURCHASE, .payload = EMPTY_DATA});
+      this->push_command_(SmCommand{.cmd = CommandType::GET_MEASUREMENT});
 
       break;
     }
-    case SmCommandSend::GET_METER_ID: {
+    case CommandType::GET_LIMIT_AND_PURCHASE: {
+      ESP_LOGV(TAG, "Push Command - GET_LIMIT_AND_PURCHASE");
+
+      this->push_command_(SmCommand{.cmd = CommandType::GET_LIMIT_AND_PURCHASE});
+
+      break;
+    }
+    case CommandType::GET_METER_ID: {
       ESP_LOGD(TAG, "Push Command - GET_METER_ID");
 
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_GET_METER_ID, .payload = EMPTY_DATA});
+      this->push_command_(SmCommand{.cmd = CommandType::GET_METER_ID});
 
       break;
     }
-    case SmCommandSend::SET_LIMIT_DATA: {
-      ESP_LOGD(TAG, "Push Command - SET_LIMIT_DATA");
+    case CommandType::SET_LIMIT: {
+      ESP_LOGD(TAG, "Push Command - SET_LIMIT");
 
       uint16_t tmp_current_limit = this->lp_data_.max_current_limit * 100;
 
@@ -1320,14 +1320,14 @@ bool Dxs238xwComponent::send_command_(SmCommandSend cmd, bool state) {
       buffer.push_back(this->lp_data_.min_voltage_limit >> 8);
       buffer.push_back(this->lp_data_.min_voltage_limit & SM_GET_ONE_BYTE);
 
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_SET_LIMIT, .payload = buffer}, false);
+      this->push_command_(SmCommand{.cmd = CommandType::SET_LIMIT, .payload = buffer}, false);
 
       ESP_LOGD(TAG, "* Input Data: max_current_limit = %u, max_voltage_limit = %u, min_voltage_limit = %u", this->lp_data_.max_current_limit, this->lp_data_.max_voltage_limit, this->lp_data_.min_voltage_limit);
 
       break;
     }
-    case SmCommandSend::SET_PURCHASE_DATA: {
-      ESP_LOGD(TAG, "Push Command - SET_PURCHASE_DATA");
+    case CommandType::SET_PURCHASE: {
+      ESP_LOGD(TAG, "Push Command - SET_PURCHASE");
 
       uint32_t purchase_value = 0;
       uint32_t purchase_alarm = 0;
@@ -1351,26 +1351,26 @@ bool Dxs238xwComponent::send_command_(SmCommandSend cmd, bool state) {
 
       buffer.push_back(state);
 
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_SET_PURCHASE, .payload = buffer}, false);
+      this->push_command_(SmCommand{.cmd = CommandType::SET_PURCHASE, .payload = buffer}, false);
 
       ESP_LOGD(TAG, "* Input Data: purchase_value = %u, purchase_alarm = %u, state = %s", (state ? this->lp_data_.energy_purchase_value : 0), (state ? this->lp_data_.energy_purchase_alarm : 0), ONOFF(state));
 
       break;
     }
-    case SmCommandSend::SET_POWER_STATE: {
-      ESP_LOGD(TAG, "Push Command - SET_POWER_STATE");
+    case CommandType::SET_METER_STATE: {
+      ESP_LOGD(TAG, "Push Command - SET_METER_STATE");
 
       std::vector<uint8_t> buffer;
 
       buffer.push_back(state);
 
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_SET_METER_STATE, .payload = buffer}, false);
+      this->push_command_(SmCommand{.cmd = CommandType::SET_METER_STATE, .payload = buffer}, false);
 
       ESP_LOGD(TAG, "* Input Data: state = %s", ONOFF(state));
 
       break;
     }
-    case SmCommandSend::SET_DELAY: {
+    case CommandType::SET_DELAY: {
       ESP_LOGD(TAG, "Push Command - SET_DELAY");
 
       uint16_t delay_value_set = 0;
@@ -1386,16 +1386,16 @@ bool Dxs238xwComponent::send_command_(SmCommandSend cmd, bool state) {
 
       buffer.push_back(state);
 
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_SET_DELAY, .payload = buffer}, false);
+      this->push_command_(SmCommand{.cmd = CommandType::SET_DELAY, .payload = buffer}, false);
 
       ESP_LOGD(TAG, "* Input Data: delay_value_set = %u, state = %s", delay_value_set, ONOFF(state));
 
       break;
     }
-    case SmCommandSend::SET_RESET: {
+    case CommandType::SET_RESET: {
       ESP_LOGD(TAG, "Push Command - SET_RESET");
 
-      this->push_command_(SmCommand{.cmd = CommandType::HEKR_CMD_SEND_SET_RESET, .payload = EMPTY_DATA}, false);
+      this->push_command_(SmCommand{.cmd = CommandType::SET_RESET}, false);
 
       break;
     }
@@ -1412,7 +1412,7 @@ void Dxs238xwComponent::process_switch_state(SmIdEntity entity, bool state) {
   if (this->get_component_state() == COMPONENT_STATE_LOOP) {
     switch (entity) {
       case SmIdEntity::SWITCH_ENERGY_PURCHASE_STATE: {
-        this->send_command_(SmCommandSend::SET_PURCHASE_DATA, state);
+        this->send_command_(CommandType::SET_PURCHASE, state);
 
         UPDATE_SWITCH_FORCE(energy_purchase_state, state)
         break;
@@ -1420,13 +1420,13 @@ void Dxs238xwComponent::process_switch_state(SmIdEntity entity, bool state) {
       case SmIdEntity::SWITCH_METER_STATE: {
         this->ms_data_.warning_off_by_user = !state;
 
-        this->send_command_(SmCommandSend::SET_POWER_STATE, state);
+        this->send_command_(CommandType::SET_METER_STATE, state);
 
         UPDATE_SWITCH_FORCE(meter_state, state)
         break;
       }
       case SmIdEntity::SWITCH_DELAY_STATE: {
-        this->send_command_(SmCommandSend::SET_DELAY, state);
+        this->send_command_(CommandType::SET_DELAY, state);
 
         UPDATE_SWITCH_FORCE(delay_state, state)
         break;
@@ -1443,8 +1443,8 @@ void Dxs238xwComponent::process_button_action(SmIdEntity entity) {
   if (this->get_component_state() == COMPONENT_STATE_LOOP) {
     switch (entity) {
       case SmIdEntity::BUTTON_RESET_DATA: {
-        this->send_command_(SmCommandSend::SET_PURCHASE_DATA, false);
-        this->send_command_(SmCommandSend::SET_RESET);
+        this->send_command_(CommandType::SET_PURCHASE, false);
+        this->send_command_(CommandType::SET_RESET);
 
         break;
       }
@@ -1465,7 +1465,7 @@ void Dxs238xwComponent::process_number_value(SmIdEntity entity, float value) {
 
         this->lp_data_.max_current_limit = tmp_value;
 
-        this->send_command_(SmCommandSend::SET_LIMIT_DATA);
+        this->send_command_(CommandType::SET_LIMIT);
 
         UPDATE_NUMBER_FORCE(max_current_limit, this->lp_data_.max_current_limit)
         break;
@@ -1476,7 +1476,7 @@ void Dxs238xwComponent::process_number_value(SmIdEntity entity, float value) {
         if (tmp_value > this->lp_data_.min_voltage_limit) {
           this->lp_data_.max_voltage_limit = tmp_value;
 
-          this->send_command_(SmCommandSend::SET_LIMIT_DATA);
+          this->send_command_(CommandType::SET_LIMIT);
         } else {
           ESP_LOGW(TAG, "max_voltage_limit - Value %u must not be less than min_voltage_limit %u", tmp_value, this->lp_data_.min_voltage_limit);
         }
@@ -1490,7 +1490,7 @@ void Dxs238xwComponent::process_number_value(SmIdEntity entity, float value) {
         if (tmp_value < this->lp_data_.max_voltage_limit) {
           this->lp_data_.min_voltage_limit = tmp_value;
 
-          this->send_command_(SmCommandSend::SET_LIMIT_DATA);
+          this->send_command_(CommandType::SET_LIMIT);
         } else {
           ESP_LOGW(TAG, "min_voltage_limit - Value %u must not be greater than max_voltage_limit %u", tmp_value, this->lp_data_.max_voltage_limit);
         }
@@ -1506,8 +1506,8 @@ void Dxs238xwComponent::process_number_value(SmIdEntity entity, float value) {
         this->save_initial_number_value_(this->preference_energy_purchase_value_, this->lp_data_.energy_purchase_value);
 
         if (this->lp_data_.energy_purchase_state) {
-          if (this->send_command_(SmCommandSend::SET_PURCHASE_DATA, false)) {
-            this->send_command_(SmCommandSend::SET_PURCHASE_DATA, true);
+          if (this->send_command_(CommandType::SET_PURCHASE, false)) {
+            this->send_command_(CommandType::SET_PURCHASE, true);
           }
         }
 
@@ -1522,8 +1522,8 @@ void Dxs238xwComponent::process_number_value(SmIdEntity entity, float value) {
         this->save_initial_number_value_(this->preference_energy_purchase_alarm_, this->lp_data_.energy_purchase_alarm);
 
         if (this->lp_data_.energy_purchase_state) {
-          if (this->send_command_(SmCommandSend::SET_PURCHASE_DATA, false)) {
-            this->send_command_(SmCommandSend::SET_PURCHASE_DATA, true);
+          if (this->send_command_(CommandType::SET_PURCHASE, false)) {
+            this->send_command_(CommandType::SET_PURCHASE, true);
           }
         }
 
@@ -1538,7 +1538,7 @@ void Dxs238xwComponent::process_number_value(SmIdEntity entity, float value) {
         this->save_initial_number_value_(this->preference_delay_value_set_, this->ms_data_.delay_value_set);
 
         if (this->ms_data_.delay_state) {
-          this->send_command_(SmCommandSend::SET_DELAY, true);
+          this->send_command_(CommandType::SET_DELAY, true);
         }
 
         UPDATE_NUMBER_FORCE(delay_value_set, this->ms_data_.delay_value_set)
@@ -1594,7 +1594,7 @@ void Dxs238xwComponent::meter_state_off() {
 void Dxs238xwComponent::set_meter_state_(bool state) {
   this->ms_data_.warning_off_by_user = !state;
 
-  this->send_command_(SmCommandSend::SET_POWER_STATE, state);
+  this->send_command_(CommandType::SET_METER_STATE, state);
 }
 
 void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
