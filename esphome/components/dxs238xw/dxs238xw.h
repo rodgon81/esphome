@@ -5,17 +5,92 @@
 #include "esphome/components/network/util.h"
 #include "esphome/core/util.h"
 
+#ifdef USE_TIME
+#include "esphome/components/time/real_time_clock.h"
+#endif
+
 namespace esphome {
 namespace dxs238xw {
 
-// #define USE_PROTOCOL_HEKR
-// #define USE_PROTOCOL_TUYA
+#define USER_MAX_LEN 0x64u
+#define HEKR_DATA_LEN 0x05u
+#define HEKR_FRAME_HEADER 0x48u
+
+typedef struct {
+  unsigned char CMD;
+  unsigned char Mode;
+  unsigned char WIFI_Status;
+  unsigned char CloudStatus;
+  unsigned char SignalStrength;  // 0-5 代表信号强度
+  unsigned char Reserved;
+} ModuleStatusFrame;
+
+enum class ModuleOperation : uint8_t {
+  MODULE_STATUS = 0x01,             // status query
+  MODULE_SOFT_REBOOT = 0x02,        // module soft restart
+  MODULE_FACTORY_RESET = 0x03,      // Restore Factory
+  Module_Config = 0x04,             // One-key configuration
+  Module_Set_Sleep = 0x05,          // go to sleep
+  Module_Weakup = 0x06,             // wake up from sleep
+  Module_Factory_Test = 0x20,       // enter factory test
+  Module_Firmware_Versions = 0x10,  // version query
+  Module_ProdKey_Get = 0x11,        // ProdKey query
+  Module_Set_ProdKey = 0x21         // ProdKey setting
+};
+
+enum class ModuleOperation222 : uint8_t {
+  STA_Mode = 0x01,
+  HekrConfig_Mode = 0x02,
+  AP_Mode = 0x03,
+  STA_AP_Mode = 0x04,
+  RF_OFF_Mode = 0x05,
+};
+
+enum class HekrModuleWIFICode : uint8_t {
+  RouterConnected = 0x01,
+  RouterConnectedFail = 0x02,
+  RouterConnecting = 0x03,
+  PasswordErr = 0x04,
+  NoRouter = 0x05,
+  RouterTimeOver = 0x06,
+};
+
+enum class HekrModuleCloudCode : uint8_t {
+  CloudConnected = 0x01,
+  DNS_Fail = 0x02,
+  CloudTimeOver = 0x03,
+};
+
+enum class RecvDataHandleCode : uint8_t {
+  RecvDataSumCheckErr = 0x01,
+  LastFrameSendErr = 0x02,
+  MCU_UploadACK = 0x03,
+  ValidDataUpdate = 0x04,
+  RecvDataUseless = 0x05,
+  HekrModuleStateUpdate = 0x06,
+  MCU_ControlModuleACK = 0x07,
+};
+
+enum class AllFrameLength : uint8_t {
+  ModuleOperationFrameLength = 0x07,
+  ModuleResponseFrameLength = 0x0B,
+  ErrorFrameLength = 0x07,
+  ProdKeyLenth = 0x16,
+};
+
+enum class AllErrorValue : uint8_t {
+  ErrorOperation = 0x01,
+  ErrorSumCheck = 0x02,
+  ErrorDataRange = 0x03,
+  ErrorNoCMD = 0xFF,
+};
+
+#define USE_PROTOCOL_HEKR
+//  #define USE_PROTOCOL_TUYA
 
 // #define USE_MODEL_DDS238_2
-// #define USE_MODEL_DDS238_4
+#define USE_MODEL_DDS238_4
 // #define USE_MODEL_DTS238_7
-
-// #define USE_RAW_MESSAGE
 
 static const char *const SM_STR_COMPONENT_VERSION = "2.0.0000 beta";
 
@@ -50,9 +125,16 @@ static const uint16_t SM_POSTPONE_SETUP_TIME = 2500;
 #endif
 
 static const uint16_t SM_MAX_MILLIS_TO_RX_BYTE = 50;
-static const uint16_t SM_MAX_MILLIS_TO_CONFIRM = 300;  // 200
-static const uint16_t SM_MAX_MILLIS_TO_RESPONSE = 1000;
 
+#ifdef USE_PROTOCOL_HEKR
+static const uint16_t SM_MAX_MILLIS_TO_CONFIRM = 200;
+static const uint16_t SM_MAX_MILLIS_TO_RESPONSE = 1000;
+static const uint8_t SM_MIN_COMMAND_LENGHT = 6;
+#endif
+#ifdef USE_PROTOCOL_TUYA
+static const uint16_t SM_MAX_MILLIS_TO_RESPONSE = 300;
+static const uint8_t SM_MIN_COMMAND_LENGHT = 7;
+#endif
 //------------------------------------------------------------------------------
 
 static const uint8_t SM_MAX_BYTE_MSG_BUFFER = 96;
@@ -69,6 +151,8 @@ static const uint8_t TUYA_HEADER_2 = 0xAA;
 // Type message
 static const uint8_t HEKR_TYPE_RECEIVE = 0x01;
 static const uint8_t HEKR_TYPE_SEND = 0x02;
+static const uint8_t HEKR_TYPE_MODULE_OPERATION = 0xFE;
+static const uint8_t HEKR_TYPE_ERROR_FRAME = 0xFF;
 
 //------------------------------------------------------------------------------
 
@@ -87,14 +171,12 @@ static const char *const SM_STR_POWER_STATE_DETAILS_END_BY_USER = "Off by User";
 static const char *const SM_STR_POWER_STATE_DETAILS_UNKNOWN = "Off by Unknown";
 
 // Error Type
-static const char *const SM_STR_TYPE_NO_ERROR = "No error type";
+static const char *const SM_STR_TYPE_COMMUNICATION = "Communication";
 static const char *const SM_STR_TYPE_COMMUNICATION_CONFIRMATION = "Communication (Confirmation Message)";
-static const char *const SM_STR_TYPE_COMMUNICATION_ANSWER = "Communication (Answer Message)";
+static const char *const SM_STR_TYPE_COMMUNICATION_RESPONSE = "Communication (Answer Message)";
 static const char *const SM_STR_TYPE_INPUT_DATA = "Input data";
 
 // Error Description
-static const char *const SM_STR_CODE_NO_ERROR = "No Errors";
-
 static const char *const SM_STR_CODE_WRONG_BYTES_HEADER = "The bytes was received but are not correct (HEADER)";
 static const char *const SM_STR_CODE_WRONG_BYTES_LENGTH = "The bytes was received but are not correct (LENGTH)";
 static const char *const SM_STR_CODE_WRONG_BYTES_TYPE_MESSAGE = "The bytes was received but are not correct (TYPE_MESSAGE)";
@@ -114,11 +196,6 @@ static const char *const SM_STR_STARTING_KWH = "starting_kWh";
 static const char *const SM_STR_PRICE_KWH = "price_kWh";
 static const char *const SM_STR_ENERGY_PURCHASE_VALUE = "energy_purchase_value";
 static const char *const SM_STR_ENERGY_PURCHASE_ALARM = "energy_purchase_alarm";
-
-// Tuya Datapoint
-static const uint8_t DATAPOINT_SWITCH_ENERGY_PURCHASE_STATE = 1;
-static const uint8_t DATAPOINT_SWITCH_METER_STATE = 2;
-static const uint8_t DATAPOINT_SWITCH_DELAY_STATE = 3;
 
 enum class SmErrorMeterStateType : uint8_t {
   POWER_OK,
@@ -152,8 +229,9 @@ enum class SmIdEntity : uint8_t {
 
 enum class SmErrorType : uint8_t {
   NO_ERROR,
+  COMMUNICATION,
   COMMUNICATION_CONFIRMATION,
-  COMMUNICATION_ANSWER,
+  COMMUNICATION_RESPONSE,
   INPUT_DATA,
 };
 
@@ -203,6 +281,36 @@ enum class TuyaInitState : uint8_t {
   INIT_DONE,
 };
 
+enum class SmCommandType : uint8_t {
+  GET_METER_STATE,
+  GET_MEASUREMENT,
+  GET_LIMIT_AND_PURCHASE,
+  GET_METER_ID,
+
+  SET_LIMIT,
+  SET_PURCHASE,
+  SET_METER_STATE,
+  SET_DELAY,
+  SET_RESET,
+
+  HEARTBEAT,
+  PRODUCT_QUERY,
+  CONF_QUERY,
+  WIFI_STATE,
+  WIFI_RESET,
+  WIFI_SELECT,
+  DATAPOINT_DELIVER,
+  DATAPOINT_REPORT,
+  DATAPOINT_QUERY,
+  WIFI_TEST,
+  LOCAL_TIME_QUERY,
+  WIFI_RSSI,
+  GET_NETWORK_STATUS,
+
+  RAW_COMMAND,
+  PROTOCOL_COMMAND,
+};
+
 #ifdef USE_PROTOCOL_HEKR
 enum class ResponseType : uint8_t {
   HEKR_CMD_RECEIVE_METER_STATE = 0x01,
@@ -239,51 +347,50 @@ enum class CommandType : uint8_t {
   WIFI_TEST = 0x0E,
   LOCAL_TIME_QUERY = 0x1C,
   WIFI_RSSI = 0x24,
-  VACUUM_MAP_UPLOAD = 0x28,
   GET_NETWORK_STATUS = 0x2B,
 };
 
-enum class Datapoint_number : uint8_t {
-  FREQUENCY = 0,
-  CURRENT = 0,
-  CURRENT_PHASE_1 = 0,
-  CURRENT_PHASE_2 = 0,
-  CURRENT_PHASE_3 = 0,
-  VOLTAGE = 0,
-  VOLTAGE_PHASE_1 = 0,
-  VOLTAGE_PHASE_2 = 0,
-  VOLTAGE_PHASE_3 = 0,
-  REACTIVE_POWER = 0,
-  REACTIVE_POWER_PHASE_1 = 0,
-  REACTIVE_POWER_PHASE_2 = 0,
-  REACTIVE_POWER_PHASE_3 = 0,
-  REACTIVE_POWER_TOTAL = 0,
-  ACTIVE_POWER = 0,
-  ACTIVE_POWER_PHASE_1 = 0,
-  ACTIVE_POWER_PHASE_2 = 0,
-  ACTIVE_POWER_PHASE_3 = 0,
-  ACTIVE_POWER_TOTAL = 0,
-  POWER_FACTOR = 0,
-  POWER_FACTOR_PHASE_1 = 0,
-  POWER_FACTOR_PHASE_2 = 0,
-  POWER_FACTOR_PHASE_3 = 0,
-  POWER_FACTOR_TOTAL = 0,
-  IMPORT_ACTIVE_ENERGY = 0,
-  EXPORT_ACTIVE_ENERGY = 0,
-  PHASE_COUNT = 0,
-  ENERGY_PURCHASE_BALANCE = 0,
-  TOTAL_ENERGY = 0,
-  DELAY_VALUE_REMAINING = 0,
-  MAX_CURRENT_LIMIT = 0,
-  MAX_VOLTAGE_LIMIT = 0,
-  MIN_VOLTAGE_LIMIT = 0,
-  ENERGY_PURCHASE_VALUE = 0,
-  ENERGY_PURCHASE_ALARM = 0,
-  DELAY_VALUE_SET = 0,
-  ENERGY_PURCHASE_STATE = 0,
-  METER_STATE = 0,
-  DELAY_STATE = 0,
-  RESET_DATA = 0,
+enum class DatapointId : uint8_t {
+  FREQUENCY = 100,
+  CURRENT = 101,
+  CURRENT_PHASE_1 = 102,
+  CURRENT_PHASE_2 = 103,
+  CURRENT_PHASE_3 = 104,
+  VOLTAGE = 105,
+  VOLTAGE_PHASE_1 = 106,
+  VOLTAGE_PHASE_2 = 107,
+  VOLTAGE_PHASE_3 = 108,
+  REACTIVE_POWER = 109,
+  REACTIVE_POWER_PHASE_1 = 110,
+  REACTIVE_POWER_PHASE_2 = 111,
+  REACTIVE_POWER_PHASE_3 = 112,
+  REACTIVE_POWER_TOTAL = 113,
+  ACTIVE_POWER = 114,
+  ACTIVE_POWER_PHASE_1 = 115,
+  ACTIVE_POWER_PHASE_2 = 116,
+  ACTIVE_POWER_PHASE_3 = 117,
+  ACTIVE_POWER_TOTAL = 118,
+  POWER_FACTOR = 119,
+  POWER_FACTOR_PHASE_1 = 120,
+  POWER_FACTOR_PHASE_2 = 121,
+  POWER_FACTOR_PHASE_3 = 122,
+  POWER_FACTOR_TOTAL = 123,
+  IMPORT_ACTIVE_ENERGY = 124,
+  EXPORT_ACTIVE_ENERGY = 125,
+  PHASE_COUNT = 126,
+  ENERGY_PURCHASE_BALANCE = 127,
+  TOTAL_ENERGY = 128,
+  DELAY_VALUE_REMAINING = 129,
+  MAX_CURRENT_LIMIT = 130,
+  MAX_VOLTAGE_LIMIT = 131,
+  MIN_VOLTAGE_LIMIT = 132,
+  ENERGY_PURCHASE_VALUE = 133,
+  ENERGY_PURCHASE_ALARM = 134,
+  DELAY_VALUE_SET = 135,
+  ENERGY_PURCHASE_STATE = 136,
+  METER_STATE = 137,
+  DELAY_STATE = 138,
+  RESET_DATA = 139,
 };
 
 enum class TuyaDatapointType : uint8_t {
@@ -314,12 +421,13 @@ struct TuyaDatapoint {
 #endif
 
 struct SmCommand {
+  SmCommandType cmd_internal = SmCommandType::PROTOCOL_COMMAND;
   CommandType cmd;
   std::vector<uint8_t> payload = std::vector<uint8_t>{};
   bool null_old_response = false;
 };
 
-struct LimitAndPurchaseData {
+struct MeterData {
   uint32_t energy_purchase_value = 0;
   uint32_t energy_purchase_alarm = 0;
   uint32_t energy_purchase_balance = 0;  // old float
@@ -329,9 +437,7 @@ struct LimitAndPurchaseData {
   uint8_t max_current_limit = 0;
   uint16_t max_voltage_limit = 0;
   uint16_t min_voltage_limit = 0;
-};
 
-struct MeterStateData {
   uint8_t phase_count = 0;
 
   bool warning_off_by_over_voltage = false;
@@ -576,7 +682,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void meter_state_on();
   void meter_state_off();
 
-  void hex_message(std::string message, bool check_crc);
+  void hex_message(std::string message, bool check_crc = true);
 
   void process_switch_state(SmIdEntity entity, bool state);
   void process_button_action(SmIdEntity entity);
@@ -605,8 +711,8 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 #ifdef USE_PROTOCOL_TUYA
   std::string product_ = "";
 
-  int status_pin_reported_ = -1;
-  int reset_pin_reported_ = -1;
+  int8_t status_pin_reported_ = -1;
+  int8_t reset_pin_reported_ = -1;
 
   uint8_t wifi_status_ = -1;
   uint8_t protocol_version_ = -1;
@@ -621,8 +727,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   std::vector<uint8_t> rx_message_;
   std::vector<SmCommand> command_queue_;
 
-  LimitAndPurchaseData lp_data_;
-  MeterStateData ms_data_;
+  MeterData data_;
 
   uint32_t hash_delay_value_set_ = fnv1_hash(SM_STR_DELAY_VALUE_SET);
   uint32_t hash_starting_kWh_ = fnv1_hash(SM_STR_STARTING_KWH);
@@ -655,23 +760,31 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void handle_command_(uint8_t command, uint8_t version, const uint8_t *buffer, size_t len);
   void process_and_update_data_(const uint8_t *buffer, size_t len);
 
-  void set_numeric_datapoint_value_(uint8_t datapoint_id, TuyaDatapointType datapoint_type, uint32_t value, uint8_t length);
+  void set_boolean_datapoint_value_(uint8_t datapoint_id, bool value, bool forced = false);
+  void set_integer_datapoint_value_(uint8_t datapoint_id, uint32_t value, bool forced = false);
+  void set_enum_datapoint_value_(uint8_t datapoint_id, uint8_t value, bool forced = false);
+  void set_bitmask_datapoint_value_(uint8_t datapoint_id, uint32_t value, uint8_t length, bool forced = false);
+  void set_raw_datapoint_value_(uint8_t datapoint_id, const std::vector<uint8_t> &value, bool forced = false);
+  void set_string_datapoint_value_(uint8_t datapoint_id, const std::string &value, bool forced = false);
+
+  void numeric_datapoint_value_(uint8_t datapoint_id, TuyaDatapointType datapoint_type, uint32_t value, uint8_t length, bool forced);
 
   void send_datapoint_command_(uint8_t datapoint_id, TuyaDatapointType datapoint_type, std::vector<uint8_t> data);
 
-  void set_boolean_datapoint_value_(uint8_t datapoint_id, bool value);
-  void set_integer_datapoint_value_(uint8_t datapoint_id, uint32_t value);
+  optional<TuyaDatapoint> get_datapoint_(uint8_t datapoint_id);
 
   uint8_t get_wifi_status_code_();
   void send_wifi_status_();
+  uint8_t get_wifi_rssi_();
+
+  void set_status_pin_();
 
   void show_info_datapoints_();
-#endif
 
-#ifdef USE_RAW_MESSAGE
-  void hex_message(std::string message, bool check_crc = true);
-  bool transmit_serial_data_(uint8_t *array, uint8_t size);
-  bool receive_serial_data_(uint8_t *array, uint8_t type_message, uint8_t cmd = 0, uint8_t size_expected = 0);
+#ifdef USE_TIME
+  void send_local_time_();
+  optional<time::RealTimeClock *> time_id_{};
+#endif
 #endif
 
   void push_command_(const SmCommand &command, bool push_back = true);
@@ -682,9 +795,10 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   void set_meter_state_(bool state);
 
-  bool send_command_(CommandType cmd, bool state = false);
+  void send_command_(SmCommandType cmd, bool state = false);
 
   void update_meter_state_detail_();
+
   bool is_message_timeout_();
 
   void incoming_messages_();
@@ -696,7 +810,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   void print_error_();
 
-  uint32_t read_initial_number_value_(ESPPreferenceObject &preference, const std::string preference_string, uint32_t default_value);
+  uint32_t read_initial_number_value_(ESPPreferenceObject &preference, const std::string &preference_string, uint32_t default_value);
   void save_initial_number_value_(ESPPreferenceObject &preference, uint32_t value);
 };
 
