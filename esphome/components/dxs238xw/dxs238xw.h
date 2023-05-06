@@ -74,14 +74,12 @@ enum class AllErrorValue : uint8_t {
 // #define USE_MODEL_DTS238_7
 
 //*************************************************************************************
-//*************************************************************************************
-//*************************************************************************************
 
 static const char *const SM_STR_COMPONENT_VERSION = "2.0.0000 beta";
 
 //*************************************************************************************
 
-#ifndef USE_PROTOCOL_HEKR or USE_PROTOCOL_TUYA
+#if !defined(USE_PROTOCOL_HEKR) && !defined(USE_PROTOCOL_TUYA)
 enum class CommandType : uint8_t {
   NONE = 0x00,
 };

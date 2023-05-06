@@ -35,8 +35,6 @@ from .const import (
     MODEL_DDS238_2,
     MODEL_DDS238_4,
     MODEL_DTS238_7,
-
-    CONF_ENABLE_RAW_MESSAGE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,7 +61,6 @@ CONFIG_SCHEMA = cv.All(
         cv.GenerateID(): cv.declare_id(Dxs238xwComponent),
         cv.Required(CONF_MODEL): cv.one_of(*MODEL_TYPES, upper=True),
         cv.Required(CONF_PROTOCOL): cv.one_of(*PROTOCOL_TYPES, lower=True),
-        cv.Optional(CONF_ENABLE_RAW_MESSAGE, default=False): cv.boolean,
     })
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(cv.polling_component_schema("3s"))
@@ -191,8 +188,7 @@ def validate_protocol_and_model(config):
             _LOGGER.info(
                 "Model and protocol supported"
             )
-
-    if config[CONF_PROTOCOL] == PROTOCOL_TUYA:
+    elif config[CONF_PROTOCOL] == PROTOCOL_TUYA:
         if config[CONF_MODEL] == MODEL_DDS238_2:
             _LOGGER.info(
                 "Model and protocol supported"
@@ -232,18 +228,16 @@ async def to_code(config):
 
     if config[CONF_MODEL] == MODEL_DDS238_2:
         cg.add_define("USE_MODEL_DDS238_2")
+    elif config[CONF_MODEL] == MODEL_DDS238_4:
+        cg.add_define("USE_MODEL_DDS238_4")
     elif config[CONF_MODEL] == MODEL_DTS238_7:
         cg.add_define("USE_MODEL_DTS238_7")
-    else:
-        cg.add_define("USE_MODEL_DDS238_4")
 
-    if config[CONF_PROTOCOL] == PROTOCOL_TUYA:
-        cg.add_define("USE_PROTOCOL_TUYA")
-    else:
+    if config[CONF_PROTOCOL] == PROTOCOL_HEKR:
         cg.add_define("USE_PROTOCOL_HEKR")
+    elif config[CONF_PROTOCOL] == PROTOCOL_TUYA:
+        cg.add_define("USE_PROTOCOL_TUYA")
 
-    if config[CONF_ENABLE_RAW_MESSAGE]:
-        cg.add_define("USE_RAW_MESSAGE")
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////
 

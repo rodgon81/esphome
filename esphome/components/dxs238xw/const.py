@@ -57,8 +57,6 @@ CONF_TEXT_SENSOR = "text_sensor"
 CONF_SWITCH = "switch"
 CONF_BUTTON = "button"
 
-CONF_ENABLE_RAW_MESSAGE = "enable_raw_message"
-
 # --------SENSOR----------
 
 CONF_CURRENT_PHASE_1 = "current_phase_1"
