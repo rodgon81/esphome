@@ -63,7 +63,7 @@ enum class AllErrorValue : uint8_t {
   ERROR_SUM_CHECK = 0x02,
   ERROR_DATA_RANGE = 0x03,
   ERROR_CMD_NO_SUPPORTED = 0x04,
-  ERROR_DATA_IS_INCONSISTENT = 0x04,
+  ERROR_DATA_IS_INCONSISTENT = 0x05,
 };
 
 // #define USE_PROTOCOL_HEKR
@@ -80,6 +80,17 @@ enum class AllErrorValue : uint8_t {
 static const char *const SM_STR_COMPONENT_VERSION = "2.0.0000 beta";
 
 //*************************************************************************************
+
+#ifndef USE_PROTOCOL_HEKR or USE_PROTOCOL_TUYA
+enum class CommandType : uint8_t {
+  NONE = 0x00,
+};
+
+static const uint8_t SM_MIN_COMMAND_LENGHT = 0;
+
+static const char *const SM_STR_PROTOCOL = "None";
+static const char *const SM_STR_METER_MODEL = "None";
+#endif
 
 #ifdef USE_MODEL_DDS238_2
 static const char *const SM_STR_METER_MODEL = "DDS238_2";
@@ -124,9 +135,7 @@ static const uint8_t SM_MIN_COMMAND_LENGHT = 7;
 #endif
 //------------------------------------------------------------------------------
 
-static const uint8_t SM_MAX_BYTE_MSG_BUFFER = 96;
 static const uint8_t SM_MAX_HEX_MSG_LENGTH = 255;
-static const uint8_t SM_MAX_HEX_MSG_LENGTH_PARSE = 176;
 
 //------------------------------------------------------------------------------
 
@@ -503,111 +512,26 @@ struct MeterData {
 #endif
 
 class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
-#ifdef USE_MODEL_DDS238_2
   DXS238XW_SENSOR(frequency)
   DXS238XW_SENSOR(current)
-  DXS238XW_SENSOR(voltage)
-  DXS238XW_SENSOR(reactive_power)
-  DXS238XW_SENSOR(active_power)
-  DXS238XW_SENSOR(power_factor)
-  DXS238XW_SENSOR(import_active_energy)
-  DXS238XW_SENSOR(export_active_energy)
-  DXS238XW_SENSOR(total_energy)
-  DXS238XW_SENSOR(total_energy_price)
-  DXS238XW_SENSOR(contract_total_energy)
-  DXS238XW_SENSOR(price_kWh)
-
-  DXS238XW_TEXT_SENSOR(meter_state_detail)
-  DXS238XW_TEXT_SENSOR(delay_value_remaining)
-  DXS238XW_TEXT_SENSOR(meter_id)
-
-  DXS238XW_NUMBER(max_current_limit)
-  DXS238XW_NUMBER(max_voltage_limit)
-  DXS238XW_NUMBER(min_voltage_limit)
-  DXS238XW_NUMBER(energy_purchase_value)
-  DXS238XW_NUMBER(energy_purchase_alarm)
-  DXS238XW_NUMBER(delay_value_set)
-  DXS238XW_NUMBER(starting_kWh)
-  DXS238XW_NUMBER(price_kWh)
-
-  DXS238XW_SWITCH(energy_purchase_state)
-  DXS238XW_SWITCH(meter_state)
-  DXS238XW_SWITCH(delay_state)
-
-  DXS238XW_BUTTON(reset_data)
-
-  DXS238XW_BINARY_SENSOR(warning_off_by_over_voltage)
-  DXS238XW_BINARY_SENSOR(warning_off_by_under_voltage)
-  DXS238XW_BINARY_SENSOR(warning_off_by_over_current)
-  DXS238XW_BINARY_SENSOR(warning_off_by_end_purchase)
-  DXS238XW_BINARY_SENSOR(warning_off_by_end_delay)
-  DXS238XW_BINARY_SENSOR(warning_off_by_user)
-  DXS238XW_BINARY_SENSOR(warning_purchase_alarm)
-  DXS238XW_BINARY_SENSOR(meter_state)
-#endif
-
-#ifdef USE_MODEL_DDS238_4
-  DXS238XW_SENSOR(frequency)
-  DXS238XW_SENSOR(current)
-  DXS238XW_SENSOR(voltage)
-  DXS238XW_SENSOR(reactive_power)
-  DXS238XW_SENSOR(active_power)
-  DXS238XW_SENSOR(power_factor)
-  DXS238XW_SENSOR(import_active_energy)
-  DXS238XW_SENSOR(export_active_energy)
-  DXS238XW_SENSOR(phase_count)
-  DXS238XW_SENSOR(energy_purchase_balance)
-  DXS238XW_SENSOR(energy_purchase_price)
-  DXS238XW_SENSOR(total_energy)
-  DXS238XW_SENSOR(total_energy_price)
-  DXS238XW_SENSOR(contract_total_energy)
-  DXS238XW_SENSOR(price_kWh)
-
-  DXS238XW_TEXT_SENSOR(meter_state_detail)
-  DXS238XW_TEXT_SENSOR(delay_value_remaining)
-  DXS238XW_TEXT_SENSOR(meter_id)
-
-  DXS238XW_NUMBER(max_current_limit)
-  DXS238XW_NUMBER(max_voltage_limit)
-  DXS238XW_NUMBER(min_voltage_limit)
-  DXS238XW_NUMBER(energy_purchase_value)
-  DXS238XW_NUMBER(energy_purchase_alarm)
-  DXS238XW_NUMBER(delay_value_set)
-  DXS238XW_NUMBER(starting_kWh)
-  DXS238XW_NUMBER(price_kWh)
-
-  DXS238XW_SWITCH(energy_purchase_state)
-  DXS238XW_SWITCH(meter_state)
-  DXS238XW_SWITCH(delay_state)
-
-  DXS238XW_BUTTON(reset_data)
-
-  DXS238XW_BINARY_SENSOR(warning_off_by_over_voltage)
-  DXS238XW_BINARY_SENSOR(warning_off_by_under_voltage)
-  DXS238XW_BINARY_SENSOR(warning_off_by_over_current)
-  DXS238XW_BINARY_SENSOR(warning_off_by_end_purchase)
-  DXS238XW_BINARY_SENSOR(warning_off_by_end_delay)
-  DXS238XW_BINARY_SENSOR(warning_off_by_user)
-  DXS238XW_BINARY_SENSOR(warning_purchase_alarm)
-  DXS238XW_BINARY_SENSOR(meter_state)
-#endif
-
-#ifdef USE_MODEL_DTS238_7
-  DXS238XW_SENSOR(frequency)
   DXS238XW_SENSOR(current_phase_1)
   DXS238XW_SENSOR(current_phase_2)
   DXS238XW_SENSOR(current_phase_3)
+  DXS238XW_SENSOR(voltage)
   DXS238XW_SENSOR(voltage_phase_1)
   DXS238XW_SENSOR(voltage_phase_2)
   DXS238XW_SENSOR(voltage_phase_3)
+  DXS238XW_SENSOR(reactive_power)
   DXS238XW_SENSOR(reactive_power_phase_1)
   DXS238XW_SENSOR(reactive_power_phase_2)
   DXS238XW_SENSOR(reactive_power_phase_3)
   DXS238XW_SENSOR(reactive_power_total)
+  DXS238XW_SENSOR(active_power)
   DXS238XW_SENSOR(active_power_phase_1)
   DXS238XW_SENSOR(active_power_phase_2)
   DXS238XW_SENSOR(active_power_phase_3)
   DXS238XW_SENSOR(active_power_total)
+  DXS238XW_SENSOR(power_factor)
   DXS238XW_SENSOR(power_factor_phase_1)
   DXS238XW_SENSOR(power_factor_phase_2)
   DXS238XW_SENSOR(power_factor_phase_3)
@@ -649,7 +573,6 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   DXS238XW_BINARY_SENSOR(warning_off_by_user)
   DXS238XW_BINARY_SENSOR(warning_purchase_alarm)
   DXS238XW_BINARY_SENSOR(meter_state)
-#endif
 
  public:
   Dxs238xwComponent() = default;
@@ -684,6 +607,8 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   uint32_t count_error_data_acquisition_ = 0;
 
+  uint8_t wifi_status_ = -1;
+
 #ifdef USE_PROTOCOL_HEKR
   uint8_t version_msg = 0;
 
@@ -705,8 +630,6 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   std::vector<TuyaDatapoint> datapoints_;
 #endif
-
-  uint8_t wifi_status_ = -1;
 
   std::vector<uint8_t> rx_message_;
   std::vector<SmCommand> command_queue_;
