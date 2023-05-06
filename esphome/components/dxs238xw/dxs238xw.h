@@ -12,87 +12,74 @@
 namespace esphome {
 namespace dxs238xw {
 
-#define USER_MAX_LEN 0x64u
-#define HEKR_DATA_LEN 0x05u
-#define HEKR_FRAME_HEADER 0x48u
-
-typedef struct {
-  unsigned char CMD;
-  unsigned char Mode;
-  unsigned char WIFI_Status;
-  unsigned char CloudStatus;
-  unsigned char SignalStrength;  // 0-5 代表信号强度
-  unsigned char Reserved;
-} ModuleStatusFrame;
-
 enum class ModuleOperation : uint8_t {
-  MODULE_STATUS = 0x01,             // status query
-  MODULE_SOFT_REBOOT = 0x02,        // module soft restart
-  MODULE_FACTORY_RESET = 0x03,      // Restore Factory
-  Module_Config = 0x04,             // One-key configuration
-  Module_Set_Sleep = 0x05,          // go to sleep
-  Module_Weakup = 0x06,             // wake up from sleep
-  Module_Factory_Test = 0x20,       // enter factory test
-  Module_Firmware_Versions = 0x10,  // version query
-  Module_ProdKey_Get = 0x11,        // ProdKey query
-  Module_Set_ProdKey = 0x21         // ProdKey setting
+  STATUS = 0x01,            // status query
+  SOFT_REBOOT = 0x02,       // module soft restart
+  FACTORY_RESET = 0x03,     // Restore Factory
+  CONFIG = 0x04,            // One-key configuration
+  SET_SLEEP = 0x05,         // go to sleep
+  WEAKUP = 0x06,            // wake up from sleep
+  FACTORY_TEST = 0x20,      // enter factory test
+  FIRMWARE_VERSION = 0x10,  // version query
+  PRODKEY_GET = 0x11,       // ProdKey query
+  SET_PRODKEY = 0x21        // ProdKey setting
 };
 
 enum class ModuleOperation222 : uint8_t {
-  STA_Mode = 0x01,
-  HekrConfig_Mode = 0x02,
-  AP_Mode = 0x03,
-  STA_AP_Mode = 0x04,
-  RF_OFF_Mode = 0x05,
+  STA_MODE = 0x01,
+  CONFIG_MODE = 0x02,
+  AP_MODE = 0x03,
+  STA_AP_MODE = 0x04,
+  RF_OFF_MODE = 0x05,
 };
 
 enum class HekrModuleWIFICode : uint8_t {
-  RouterConnected = 0x01,
-  RouterConnectedFail = 0x02,
-  RouterConnecting = 0x03,
-  PasswordErr = 0x04,
-  NoRouter = 0x05,
-  RouterTimeOver = 0x06,
+  ROUTER_CONNECTED = 0x01,
+  ROUTER_CONNECTED_FAIL = 0x02,
+  ROUTER_CONNECTING = 0x03,
+  PASSWOR_DERR = 0x04,
+  NO_ROUTER = 0x05,
+  ROUTER_TIMEO_VER = 0x06,
 };
 
 enum class HekrModuleCloudCode : uint8_t {
-  CloudConnected = 0x01,
-  DNS_Fail = 0x02,
-  CloudTimeOver = 0x03,
+  CLOUD_CONNECTED = 0x01,
+  DNS_FAIL = 0x02,
+  CLOUD_TIME_OVER = 0x03,
 };
 
 enum class RecvDataHandleCode : uint8_t {
-  RecvDataSumCheckErr = 0x01,
-  LastFrameSendErr = 0x02,
-  MCU_UploadACK = 0x03,
-  ValidDataUpdate = 0x04,
-  RecvDataUseless = 0x05,
-  HekrModuleStateUpdate = 0x06,
-  MCU_ControlModuleACK = 0x07,
-};
-
-enum class AllFrameLength : uint8_t {
-  ModuleOperationFrameLength = 0x07,
-  ModuleResponseFrameLength = 0x0B,
-  ErrorFrameLength = 0x07,
-  ProdKeyLenth = 0x16,
+  RECV_DATA_SUM_CHECKERR = 0x01,
+  LAST_FRAME_SENDER = 0x02,
+  MCU_UPLOAD_ACK = 0x03,
+  VALID_DATA_UPDATE = 0x04,
+  RECV_DATA_USELESS = 0x05,
+  MODULE_STATE_UPDATE = 0x06,
+  MCU_CONTROL_MODULE_ACK = 0x07,
 };
 
 enum class AllErrorValue : uint8_t {
-  ErrorOperation = 0x01,
-  ErrorSumCheck = 0x02,
-  ErrorDataRange = 0x03,
-  ErrorNoCMD = 0xFF,
+  ERROR_OPERATION = 0x01,
+  ERROR_SUM_CHECK = 0x02,
+  ERROR_DATA_RANGE = 0x03,
+  ERROR_CMD_NO_SUPPORTED = 0x04,
+  ERROR_DATA_IS_INCONSISTENT = 0x04,
 };
 
-#define USE_PROTOCOL_HEKR
-//  #define USE_PROTOCOL_TUYA
+// #define USE_PROTOCOL_HEKR
+// #define USE_PROTOCOL_TUYA
 
 // #define USE_MODEL_DDS238_2
-#define USE_MODEL_DDS238_4
+// #define USE_MODEL_DDS238_4
 // #define USE_MODEL_DTS238_7
 
+//*************************************************************************************
+//*************************************************************************************
+//*************************************************************************************
+
 static const char *const SM_STR_COMPONENT_VERSION = "2.0.0000 beta";
+
+//*************************************************************************************
 
 #ifdef USE_MODEL_DDS238_2
 static const char *const SM_STR_METER_MODEL = "DDS238_2";
@@ -148,12 +135,6 @@ static const uint8_t HEKR_HEADER = 0x48;
 static const uint8_t TUYA_HEADER_1 = 0x55;
 static const uint8_t TUYA_HEADER_2 = 0xAA;
 
-// Type message
-static const uint8_t HEKR_TYPE_RECEIVE = 0x01;
-static const uint8_t HEKR_TYPE_SEND = 0x02;
-static const uint8_t HEKR_TYPE_MODULE_OPERATION = 0xFE;
-static const uint8_t HEKR_TYPE_ERROR_FRAME = 0xFF;
-
 //------------------------------------------------------------------------------
 
 static const uint8_t SM_GET_ONE_BYTE = 0xFF;
@@ -181,6 +162,7 @@ static const char *const SM_STR_CODE_WRONG_BYTES_HEADER = "The bytes was receive
 static const char *const SM_STR_CODE_WRONG_BYTES_LENGTH = "The bytes was received but are not correct (LENGTH)";
 static const char *const SM_STR_CODE_WRONG_BYTES_TYPE_MESSAGE = "The bytes was received but are not correct (TYPE_MESSAGE)";
 static const char *const SM_STR_CODE_WRONG_BYTES_COMMAND = "The bytes was received but are not correct (COMMAND)";
+static const char *const SM_STR_CODE_WRONG_BYTES_VERSION_PROTOCOL = "Tuya Protocol send 0x00 version (VERSION)";
 
 static const char *const SM_STR_CODE_CRC = "CRC check failed";
 
@@ -240,6 +222,7 @@ enum class SmErrorCode : uint8_t {
   CRC,
   WRONG_BYTES_HEADER,
   WRONG_BYTES_LENGTH,
+  WRONG_BYTES_VERSION_PROTOCOL,
   WRONG_BYTES_TYPE_MESSAGE,
   WRONG_BYTES_COMMAND,
   NOT_ENOUGHT_BYTES,
@@ -292,23 +275,6 @@ enum class SmCommandType : uint8_t {
   SET_METER_STATE,
   SET_DELAY,
   SET_RESET,
-
-  HEARTBEAT,
-  PRODUCT_QUERY,
-  CONF_QUERY,
-  WIFI_STATE,
-  WIFI_RESET,
-  WIFI_SELECT,
-  DATAPOINT_DELIVER,
-  DATAPOINT_REPORT,
-  DATAPOINT_QUERY,
-  WIFI_TEST,
-  LOCAL_TIME_QUERY,
-  WIFI_RSSI,
-  GET_NETWORK_STATUS,
-
-  RAW_COMMAND,
-  PROTOCOL_COMMAND,
 };
 
 #ifdef USE_PROTOCOL_HEKR
@@ -319,7 +285,7 @@ enum class ResponseType : uint8_t {
   HEKR_CMD_RECEIVE_METER_ID = 0x07,
 };
 
-enum class CommandType : uint8_t {
+enum class CommandData : uint8_t {
   GET_METER_STATE = 0x00,
   GET_MEASUREMENT = 0x0A,
   GET_LIMIT_AND_PURCHASE = 0x02,
@@ -330,6 +296,13 @@ enum class CommandType : uint8_t {
   SET_METER_STATE = 0x09,
   SET_DELAY = 0x0C,
   SET_RESET = 0x05,
+};
+
+enum class CommandType : uint8_t {
+  RECEIVE = 0x01,
+  SEND = 0x02,
+  MODULE_OPERATION = 0xFE,
+  ERROR_FRAME = 0xFF,
 };
 #endif
 
@@ -403,7 +376,7 @@ enum class TuyaDatapointType : uint8_t {
 };
 
 struct TuyaDatapoint {
-  uint8_t id;
+  DatapointId id;
   TuyaDatapointType type;
   size_t len;
 
@@ -421,10 +394,10 @@ struct TuyaDatapoint {
 #endif
 
 struct SmCommand {
-  SmCommandType cmd_internal = SmCommandType::PROTOCOL_COMMAND;
   CommandType cmd;
   std::vector<uint8_t> payload = std::vector<uint8_t>{};
   bool null_old_response = false;
+  bool raw = false;
 };
 
 struct MeterData {
@@ -452,8 +425,8 @@ struct MeterData {
   bool meter_state = false;
   bool delay_state = false;
 
-  uint32_t starting_kWh = 0;  // old float
-  uint32_t price_kWh = 0;     // old float
+  float starting_kWh = 0;
+  float price_kWh = 0;
 
   float total_energy = 0;
 
@@ -545,21 +518,31 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   DXS238XW_SENSOR(price_kWh)
 
   DXS238XW_TEXT_SENSOR(meter_state_detail)
+  DXS238XW_TEXT_SENSOR(delay_value_remaining)
+  DXS238XW_TEXT_SENSOR(meter_id)
 
   DXS238XW_NUMBER(max_current_limit)
   DXS238XW_NUMBER(max_voltage_limit)
   DXS238XW_NUMBER(min_voltage_limit)
+  DXS238XW_NUMBER(energy_purchase_value)
+  DXS238XW_NUMBER(energy_purchase_alarm)
+  DXS238XW_NUMBER(delay_value_set)
   DXS238XW_NUMBER(starting_kWh)
   DXS238XW_NUMBER(price_kWh)
 
+  DXS238XW_SWITCH(energy_purchase_state)
   DXS238XW_SWITCH(meter_state)
+  DXS238XW_SWITCH(delay_state)
 
   DXS238XW_BUTTON(reset_data)
 
   DXS238XW_BINARY_SENSOR(warning_off_by_over_voltage)
   DXS238XW_BINARY_SENSOR(warning_off_by_under_voltage)
   DXS238XW_BINARY_SENSOR(warning_off_by_over_current)
+  DXS238XW_BINARY_SENSOR(warning_off_by_end_purchase)
+  DXS238XW_BINARY_SENSOR(warning_off_by_end_delay)
   DXS238XW_BINARY_SENSOR(warning_off_by_user)
+  DXS238XW_BINARY_SENSOR(warning_purchase_alarm)
   DXS238XW_BINARY_SENSOR(meter_state)
 #endif
 
@@ -705,7 +688,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   uint8_t version_msg = 0;
 
   optional<CommandType> expected_confirmation_{};
-  optional<ResponseType> expected_response_{};
+  optional<CommandType> expected_response_{};
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
@@ -714,7 +697,6 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   int8_t status_pin_reported_ = -1;
   int8_t reset_pin_reported_ = -1;
 
-  uint8_t wifi_status_ = -1;
   uint8_t protocol_version_ = -1;
 
   optional<InternalGPIOPin *> status_pin_{};
@@ -723,6 +705,8 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   std::vector<TuyaDatapoint> datapoints_;
 #endif
+
+  uint8_t wifi_status_ = -1;
 
   std::vector<uint8_t> rx_message_;
   std::vector<SmCommand> command_queue_;
@@ -744,72 +728,58 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   SmErrorType error_type_ = SmErrorType::NO_ERROR;
   SmErrorCode error_code_ = SmErrorCode::NO_ERROR;
 
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////////////////////
 
-  void process_command_queue_();
-  void send_raw_command_(SmCommand command);
-
+  bool first_data_acquisition_();
+  void incoming_messages_();
   bool validate_message_();
 
 #ifdef USE_PROTOCOL_HEKR
   void handle_command_(uint8_t command, const uint8_t *buffer, size_t len);
-  void process_and_update_data_(uint8_t command, const uint8_t *buffer);
+  void process_and_update_data_(const uint8_t *buffer, size_t len);
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
   void handle_command_(uint8_t command, uint8_t version, const uint8_t *buffer, size_t len);
   void process_and_update_data_(const uint8_t *buffer, size_t len);
 
-  void set_boolean_datapoint_value_(uint8_t datapoint_id, bool value, bool forced = false);
-  void set_integer_datapoint_value_(uint8_t datapoint_id, uint32_t value, bool forced = false);
-  void set_enum_datapoint_value_(uint8_t datapoint_id, uint8_t value, bool forced = false);
-  void set_bitmask_datapoint_value_(uint8_t datapoint_id, uint32_t value, uint8_t length, bool forced = false);
-  void set_raw_datapoint_value_(uint8_t datapoint_id, const std::vector<uint8_t> &value, bool forced = false);
-  void set_string_datapoint_value_(uint8_t datapoint_id, const std::string &value, bool forced = false);
+  void set_boolean_datapoint_value_(DatapointId datapoint_id, bool value, bool forced = false);
+  void set_integer_datapoint_value_(DatapointId datapoint_id, uint32_t value, bool forced = false);
+  void set_enum_datapoint_value_(DatapointId datapoint_id, uint8_t value, bool forced = false);
+  void set_bitmask_datapoint_value_(DatapointId datapoint_id, uint32_t value, uint8_t length, bool forced = false);
+  void set_raw_datapoint_value_(DatapointId datapoint_id, const std::vector<uint8_t> &value, bool forced = false);
+  void set_string_datapoint_value_(DatapointId datapoint_id, const std::string &value, bool forced = false);
 
-  void numeric_datapoint_value_(uint8_t datapoint_id, TuyaDatapointType datapoint_type, uint32_t value, uint8_t length, bool forced);
-
-  void send_datapoint_command_(uint8_t datapoint_id, TuyaDatapointType datapoint_type, std::vector<uint8_t> data);
-
-  optional<TuyaDatapoint> get_datapoint_(uint8_t datapoint_id);
-
-  uint8_t get_wifi_status_code_();
-  void send_wifi_status_();
-  uint8_t get_wifi_rssi_();
-
-  void set_status_pin_();
-
+  void numeric_datapoint_value_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, uint32_t value, uint8_t length, bool forced);
+  void send_datapoint_command_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, std::vector<uint8_t> data);
+  optional<TuyaDatapoint> get_datapoint_(DatapointId datapoint_id);
   void show_info_datapoints_();
+  void set_status_pin_();
+#endif
+
+  void send_wifi_status_();
+  uint8_t get_wifi_status_code_();
+  uint8_t get_wifi_rssi_();
 
 #ifdef USE_TIME
   void send_local_time_();
   optional<time::RealTimeClock *> time_id_{};
 #endif
-#endif
+
+  void process_command_queue_();
+  void send_raw_command_(SmCommand command);
 
   void push_command_(const SmCommand &command, bool push_back = true);
-
-  bool is_expected_message();
-
-  bool first_data_acquisition_();
-
-  void set_meter_state_(bool state);
-
   void send_command_(SmCommandType cmd, bool state = false);
 
-  void update_meter_state_detail_();
-
+  bool is_expected_message();
   bool is_message_timeout_();
-
-  void incoming_messages_();
-
+  void set_meter_state_(bool state);
+  void update_meter_state_detail_();
   std::string get_delay_value_remaining_string_(uint16_t value);
   std::string get_meter_state_string_(SmErrorMeterStateType error);
-
   uint8_t calculate_crc_(const uint8_t *array, uint8_t size);
-
   void print_error_();
-
   uint32_t read_initial_number_value_(ESPPreferenceObject &preference, const std::string &preference_string, uint32_t default_value);
   void save_initial_number_value_(ESPPreferenceObject &preference, uint32_t value);
 };
