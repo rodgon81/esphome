@@ -345,13 +345,17 @@ bool Dxs238xwComponent::validate_message_() {
   }
 
   if (at == 3) {
-    // if (new_byte == this->version_msg) {
-    return true;
-    /*} else {
-      ESP_LOGW(TAG, "* WRONG_BYTES: HEKR_VERSION_MESSAGE / Expected = %02X, Receive = %02X", HEKR_TYPE_RECEIVE, new_byte);
-      this->error_code_ = SmErrorCode::WRONG_BYTES_TYPE_MESSAGE;
-      return false;
-    }*/
+    if (this->expected_confirmation_.has_value()) {
+      if (new_byte == this->version_msg) {
+        return true;
+      } else {
+        ESP_LOGW(TAG, "* WRONG_BYTES: HEKR_VERSION_MESSAGE / Expected = %02X, Receive = %02X", this->version_msg, new_byte);
+        this->error_code_ = SmErrorCode::WRONG_BYTES_VERSION_MESSAGE;
+        return false;
+      }
+    } else {
+      return true;
+    }
   }
 
   // wait until all data is read
@@ -453,7 +457,7 @@ bool Dxs238xwComponent::validate_message_() {
 }
 
 #ifdef USE_PROTOCOL_HEKR
-void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, size_t len) {
+void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, size_t len) {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
   CommandType command_type = (CommandType) command;
 
   if (this->expected_confirmation_.has_value()) {
@@ -1168,6 +1172,16 @@ optional<TuyaDatapoint> Dxs238xwComponent::get_datapoint_(DatapointId datapoint_
 void Dxs238xwComponent::show_info_datapoints_() {
   ESP_LOGCONFIG(TAG, "Datapoints:");
 
+  if (this->init_state_ != TuyaInitState::INIT_DONE) {
+    if (this->init_failed_) {
+      ESP_LOGCONFIG(TAG, "  Initialization failed. Current init_state: %u", static_cast<uint8_t>(this->init_state_));
+    } else {
+      ESP_LOGCONFIG(TAG, "  Configuration will be reported when setup is complete. Current init_state: %u", static_cast<uint8_t>(this->init_state_));
+    }
+    ESP_LOGCONFIG(TAG, "  If no further output is received, confirm that this is a supported Tuya device.");
+    return;
+  }
+
   for (auto &info : this->datapoints_) {
     if (info.type == TuyaDatapointType::RAW) {
       ESP_LOGCONFIG(TAG, "* Datapoint %u: raw (value: %s)", info.id, format_hex_pretty(info.value_raw).c_str());
@@ -1204,7 +1218,7 @@ void Dxs238xwComponent::set_status_pin_() {
 }
 #endif
 
-void Dxs238xwComponent::send_wifi_status_() {
+void Dxs238xwComponent::send_wifi_status_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
   uint8_t status = this->get_wifi_status_code_();
 
   if (status == this->wifi_status_) {
@@ -1218,7 +1232,7 @@ void Dxs238xwComponent::send_wifi_status_() {
   // this->push_command_(SmCommand{.cmd = CommandType::WIFI_STATE, .payload = std::vector<uint8_t>{status}}, PUSH_BACK);
 }
 
-uint8_t Dxs238xwComponent::get_wifi_status_code_() {
+uint8_t Dxs238xwComponent::get_wifi_status_code_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
   uint8_t status = 0x02;
 
   if (network::is_connected()) {
@@ -1239,7 +1253,7 @@ uint8_t Dxs238xwComponent::get_wifi_status_code_() {
   return status;
 }
 
-uint8_t Dxs238xwComponent::get_wifi_rssi_() {
+uint8_t Dxs238xwComponent::get_wifi_rssi_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
 #ifdef USE_WIFI
   if (wifi::global_wifi_component != nullptr) {
     return wifi::global_wifi_component->wifi_rssi();
@@ -1250,7 +1264,7 @@ uint8_t Dxs238xwComponent::get_wifi_rssi_() {
 }
 
 #ifdef USE_TIME
-void Dxs238xwComponent::send_local_time_() {
+void Dxs238xwComponent::send_local_time_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
   std::vector<uint8_t> payload;
 
   auto *time_id = *this->time_id_;
@@ -1289,7 +1303,7 @@ void Dxs238xwComponent::send_local_time_() {
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 
-void Dxs238xwComponent::process_command_queue_() {
+void Dxs238xwComponent::process_command_queue_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
   uint32_t now = millis();
 
   // Limpiamos el buffer de rx si ya paso mucho tiempo y no llego un mensaje valido
@@ -1372,7 +1386,7 @@ void Dxs238xwComponent::send_raw_command_(SmCommand command) {
   buffer.push_back(HEKR_HEADER);
   buffer.push_back(4 + command.payload.size() + 1);
   buffer.push_back((uint8_t) command.cmd);
-  buffer.push_back(this->version_msg++);
+  buffer.push_back(++this->version_msg);
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
@@ -1418,17 +1432,19 @@ void Dxs238xwComponent::send_raw_command_(SmCommand command) {
 
 #ifdef USE_PROTOCOL_HEKR
 
-  if (command.raw) {
-    ESP_LOGD(TAG, "* Waiting to confirmation");
-  } else {
-    ESP_LOGV(TAG, "* Waiting to confirmation");
+  if (this->expected_confirmation_.has_value()) {
+    if (command.raw) {
+      ESP_LOGD(TAG, "* Waiting to confirmation");
+    } else {
+      ESP_LOGV(TAG, "* Waiting to confirmation");
+    }
   }
 
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
 
-  if (!this->expected_response_.has_value()) {
+  if (this->expected_response_.has_value()) {
     if (command.raw) {
       ESP_LOGD(TAG, "* Waiting to response");
     } else {
@@ -1537,7 +1553,7 @@ void Dxs238xwComponent::push_command_(const SmCommand &command, bool push_back) 
   }
 }
 
-void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {
+void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
   switch (cmd) {
     case SmCommandType::GET_METER_STATE: {
       ESP_LOGV(TAG, "Push Command - GET_METER_STATE");
@@ -2176,6 +2192,9 @@ void Dxs238xwComponent::print_error_() {
       break;
     case SmErrorCode::WRONG_BYTES_VERSION_PROTOCOL:
       string_code = SM_STR_CODE_WRONG_BYTES_VERSION_PROTOCOL;
+      break;
+    case SmErrorCode::WRONG_BYTES_VERSION_MESSAGE:
+      string_code = SM_STR_CODE_WRONG_BYTES_VERSION_MESSAGE;
       break;
     case SmErrorCode::NOT_ENOUGHT_BYTES:
       string_code = SM_STR_CODE_NOT_ENOUGH_BYTES;

@@ -93,6 +93,8 @@ static const char *const SM_STR_PROTOCOL = "None";
 static const char *const SM_STR_METER_MODEL = "None";
 #endif
 
+//*************************************************************************************
+
 #ifdef USE_MODEL_DDS238_2
 static const char *const SM_STR_METER_MODEL = "DDS238_2";
 #endif
@@ -176,6 +178,7 @@ static const char *const SM_STR_CODE_WRONG_BYTES_LENGTH = "The bytes was receive
 static const char *const SM_STR_CODE_WRONG_BYTES_TYPE_MESSAGE = "The bytes was received but are not correct (TYPE_MESSAGE)";
 static const char *const SM_STR_CODE_WRONG_BYTES_COMMAND = "The bytes was received but are not correct (COMMAND)";
 static const char *const SM_STR_CODE_WRONG_BYTES_VERSION_PROTOCOL = "Tuya Protocol send 0x00 version (VERSION)";
+static const char *const SM_STR_CODE_WRONG_BYTES_VERSION_MESSAGE = "Hekr Protocol invalid version confirmation message";
 
 static const char *const SM_STR_CODE_CRC = "CRC check failed";
 
@@ -236,6 +239,7 @@ enum class SmErrorCode : uint8_t {
   WRONG_BYTES_HEADER,
   WRONG_BYTES_LENGTH,
   WRONG_BYTES_VERSION_PROTOCOL,
+  WRONG_BYTES_VERSION_MESSAGE,
   WRONG_BYTES_TYPE_MESSAGE,
   WRONG_BYTES_COMMAND,
   NOT_ENOUGHT_BYTES,
@@ -623,6 +627,8 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
 #ifdef USE_PROTOCOL_TUYA
   std::string product_ = "";
+
+  bool init_failed_ = false;
 
   int8_t status_pin_reported_ = -1;
   int8_t reset_pin_reported_ = -1;
