@@ -87,6 +87,9 @@ enum class CommandType : uint8_t {
 static const uint8_t SM_MIN_COMMAND_LENGHT = 0;
 
 static const char *const SM_STR_PROTOCOL = "None";
+#endif
+
+#if !defined(USE_MODEL_DDS238_2) && !defined(USE_MODEL_DDS238_4) && !defined(USE_MODEL_DTS238_7)
 static const char *const SM_STR_METER_MODEL = "None";
 #endif
 
@@ -145,6 +148,9 @@ static const uint8_t TUYA_HEADER_2 = 0xAA;
 //------------------------------------------------------------------------------
 
 static const uint8_t SM_GET_ONE_BYTE = 0xFF;
+
+static const bool PUSH_BACK = true;
+static const bool PUSH_FRONT = false;
 
 //------------------------------------------------------------------------------
 
@@ -436,6 +442,7 @@ struct MeterData {
   float price_kWh = 0;
 
   float total_energy = 0;
+  float active_power_total = 0;
 
   SmErrorMeterStateType meter_state_detail = SmErrorMeterStateType::UNKNOWN;
 
@@ -690,7 +697,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void process_command_queue_();
   void send_raw_command_(SmCommand command);
 
-  void push_command_(const SmCommand &command, bool push_back = true);
+  void push_command_(const SmCommand &command, bool push_back);
   void send_command_(SmCommandType cmd, bool state = false);
 
   bool is_expected_message();
