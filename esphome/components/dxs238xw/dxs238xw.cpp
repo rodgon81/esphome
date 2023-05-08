@@ -226,6 +226,24 @@ void Dxs238xwComponent::setup() {
       }
     });
 
+    std::vector<uint8_t> myData;
+    myData.push_back(0x25);
+    myData.push_back(0x35);
+    myData.push_back(0x45);
+    myData.push_back(0x55);
+    myData.push_back(0x65);
+    myData.push_back(0xAA);
+    myData.push_back(0xBB);
+    myData.push_back(0xCC);
+    myData.push_back(0xDD);
+    ESP_LOGI(TAG, "* Vector: %s", format_hex_pretty(myData).c_str());
+
+    std::string encodedData = this->base64_encode_(&myData[0], myData.size());
+    ESP_LOGI(TAG, "* encodedData: %s", encodedData.c_str());
+
+    std::vector<uint8_t> decodedData = this->base64_decode_(encodedData);
+    ESP_LOGI(TAG, "* decodedData: %s", format_hex_pretty(decodedData).c_str());
+
     ESP_LOGI(TAG, "Out --- setup");
   }
 }
@@ -2238,6 +2256,91 @@ void Dxs238xwComponent::save_initial_number_value_(ESPPreferenceObject &preferen
   } else {
     ESP_LOGE(TAG, "* Error save new initial value = %u", value);
   }
+}
+
+std::string Dxs238xwComponent::base64_encode_(const uint8_t *buf, size_t bufLen) {
+  std::string ret;
+  int i = 0;
+  int j = 0;
+  uint8_t char_array_3[3];
+  uint8_t char_array_4[4];
+
+  while (bufLen--) {
+    char_array_3[i++] = *(buf++);
+
+    if (i == 3) {
+      char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+      char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+      char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+      char_array_4[3] = char_array_3[2] & 0x3f;
+
+      for (i = 0; (i < 4); i++)
+        ret += base64_chars[char_array_4[i]];
+      i = 0;
+    }
+  }
+
+  if (i) {
+    for (j = i; j < 3; j++)
+      char_array_3[j] = '\0';
+
+    char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+    char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+    char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+    char_array_4[3] = char_array_3[2] & 0x3f;
+
+    for (j = 0; (j < i + 1); j++)
+      ret += base64_chars[char_array_4[j]];
+
+    while ((i++ < 3))
+      ret += '=';
+  }
+
+  return ret;
+}
+
+std::vector<uint8_t> Dxs238xwComponent::base64_decode_(const std::string &encoded_string) {
+  int in_len = encoded_string.size();
+  int i = 0;
+  int j = 0;
+  int in_ = 0;
+  uint8_t char_array_4[4], char_array_3[3];
+  std::vector<uint8_t> ret;
+
+  while (in_len-- && (encoded_string[in_] != '=') && (isalnum(encoded_string[in_]) || (encoded_string[in_] == '+') || (encoded_string[in_] == '/'))) {
+    char_array_4[i++] = encoded_string[in_];
+    in_++;
+
+    if (i == 4) {
+      for (i = 0; i < 4; i++)
+        char_array_4[i] = base64_chars.find(char_array_4[i]);
+
+      char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+      char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+      char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+      for (i = 0; (i < 3); i++)
+        ret.push_back(char_array_3[i]);
+      i = 0;
+    }
+  }
+
+  if (i) {
+    for (j = i; j < 4; j++)
+      char_array_4[j] = 0;
+
+    for (j = 0; j < 4; j++)
+      char_array_4[j] = base64_chars.find(char_array_4[j]);
+
+    char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+    char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+    char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+    for (j = 0; (j < i - 1); j++)
+      ret.push_back(char_array_3[j]);
+  }
+
+  return ret;
 }
 
 }  // namespace dxs238xw

@@ -195,6 +195,10 @@ static const char *const SM_STR_PRICE_KWH = "price_kWh";
 static const char *const SM_STR_ENERGY_PURCHASE_VALUE = "energy_purchase_value";
 static const char *const SM_STR_ENERGY_PURCHASE_ALARM = "energy_purchase_alarm";
 
+static const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                        "abcdefghijklmnopqrstuvwxyz"
+                                        "0123456789+/";
+
 enum class SmErrorMeterStateType : uint8_t {
   POWER_OK,
   OVER_VOLTAGE,
@@ -716,6 +720,9 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void print_error_();
   uint32_t read_initial_number_value_(ESPPreferenceObject &preference, const std::string &preference_string, uint32_t default_value);
   void save_initial_number_value_(ESPPreferenceObject &preference, uint32_t value);
+
+  std::string base64_encode_(const uint8_t *buf, size_t bufLen);
+  std::vector<uint8_t> base64_decode_(const std::string &encoded_string);
 };
 
 }  // namespace dxs238xw
