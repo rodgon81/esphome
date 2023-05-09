@@ -12,60 +12,6 @@
 namespace esphome {
 namespace dxs238xw {
 
-enum class ModuleOperation : uint8_t {
-  STATUS = 0x01,            // status query
-  SOFT_REBOOT = 0x02,       // module soft restart
-  FACTORY_RESET = 0x03,     // Restore Factory
-  CONFIG = 0x04,            // One-key configuration
-  SET_SLEEP = 0x05,         // go to sleep
-  WEAKUP = 0x06,            // wake up from sleep
-  FACTORY_TEST = 0x20,      // enter factory test
-  FIRMWARE_VERSION = 0x10,  // version query
-  PRODKEY_GET = 0x11,       // ProdKey query
-  SET_PRODKEY = 0x21        // ProdKey setting
-};
-
-enum class ModuleOperation222 : uint8_t {
-  STA_MODE = 0x01,
-  CONFIG_MODE = 0x02,
-  AP_MODE = 0x03,
-  STA_AP_MODE = 0x04,
-  RF_OFF_MODE = 0x05,
-};
-
-enum class HekrModuleWIFICode : uint8_t {
-  ROUTER_CONNECTED = 0x01,
-  ROUTER_CONNECTED_FAIL = 0x02,
-  ROUTER_CONNECTING = 0x03,
-  PASSWOR_DERR = 0x04,
-  NO_ROUTER = 0x05,
-  ROUTER_TIMEO_VER = 0x06,
-};
-
-enum class HekrModuleCloudCode : uint8_t {
-  CLOUD_CONNECTED = 0x01,
-  DNS_FAIL = 0x02,
-  CLOUD_TIME_OVER = 0x03,
-};
-
-enum class RecvDataHandleCode : uint8_t {
-  RECV_DATA_SUM_CHECKERR = 0x01,
-  LAST_FRAME_SENDER = 0x02,
-  MCU_UPLOAD_ACK = 0x03,
-  VALID_DATA_UPDATE = 0x04,
-  RECV_DATA_USELESS = 0x05,
-  MODULE_STATE_UPDATE = 0x06,
-  MCU_CONTROL_MODULE_ACK = 0x07,
-};
-
-enum class AllErrorValue : uint8_t {
-  ERROR_OPERATION = 0x01,
-  ERROR_SUM_CHECK = 0x02,
-  ERROR_DATA_RANGE = 0x03,
-  ERROR_CMD_NO_SUPPORTED = 0x04,
-  ERROR_DATA_IS_INCONSISTENT = 0x05,
-};
-
 // #define USE_PROTOCOL_HEKR
 // #define USE_PROTOCOL_TUYA
 
@@ -93,7 +39,9 @@ static const char *const SM_STR_PROTOCOL = "None";
 static const char *const SM_STR_METER_MODEL = "None";
 #endif
 
-//*************************************************************************************
+//------------------------------------------------------------------------------
+// DEFAULTS
+//------------------------------------------------------------------------------
 
 #ifdef USE_MODEL_DDS238_2
 static const char *const SM_STR_METER_MODEL = "DDS238_2";
@@ -105,49 +53,40 @@ static const char *const SM_STR_METER_MODEL = "DDS238_4";
 static const char *const SM_STR_METER_MODEL = "DTS238_7";
 #endif
 
-#ifdef USE_PROTOCOL_HEKR
-static const char *const SM_STR_PROTOCOL = "Hekr";
-#endif
-
-#ifdef USE_PROTOCOL_TUYA
-static const char *const SM_STR_PROTOCOL = "Tuya";
-#endif
-
-//------------------------------------------------------------------------------
-// DEFAULTS
-//------------------------------------------------------------------------------
-
-static const uint16_t SM_MIN_INTERVAL_TO_GET_DATA = 500;
-
 #ifdef USE_API
 static const uint16_t SM_POSTPONE_SETUP_TIME = 10000;
 #else
 static const uint16_t SM_POSTPONE_SETUP_TIME = 2500;
 #endif
 
-static const uint16_t SM_MAX_MILLIS_TO_RX_BYTE = 50;
-
 #ifdef USE_PROTOCOL_HEKR
+static const char *const SM_STR_PROTOCOL = "Hekr";
+
+static const uint8_t HEKR_HEADER = 0x48;
+
 static const uint16_t SM_MAX_MILLIS_TO_CONFIRM = 200;
 static const uint16_t SM_MAX_MILLIS_TO_RESPONSE = 1000;
+
 static const uint8_t SM_MIN_COMMAND_LENGHT = 6;
 #endif
+
 #ifdef USE_PROTOCOL_TUYA
-static const uint16_t SM_MAX_MILLIS_TO_RESPONSE = 300;
-static const uint8_t SM_MIN_COMMAND_LENGHT = 7;
-#endif
-//------------------------------------------------------------------------------
+static const char *const SM_STR_PROTOCOL = "Tuya";
 
-static const uint8_t SM_MAX_HEX_MSG_LENGTH = 255;
-
-//------------------------------------------------------------------------------
-
-// Header
-static const uint8_t HEKR_HEADER = 0x48;
 static const uint8_t TUYA_HEADER_1 = 0x55;
 static const uint8_t TUYA_HEADER_2 = 0xAA;
 
+static const uint16_t SM_MAX_MILLIS_TO_RESPONSE = 300;
+
+static const uint8_t SM_MIN_COMMAND_LENGHT = 7;
+#endif
+
 //------------------------------------------------------------------------------
+
+static const uint16_t SM_MIN_INTERVAL_TO_GET_DATA = 500;
+static const uint8_t SM_MAX_MILLIS_TO_RX_BYTE = 50;
+
+static const uint8_t SM_MAX_HEX_MSG_LENGTH = 255;
 
 static const uint8_t SM_GET_ONE_BYTE = 0xFF;
 
@@ -177,7 +116,7 @@ static const char *const SM_STR_CODE_WRONG_BYTES_HEADER = "The bytes was receive
 static const char *const SM_STR_CODE_WRONG_BYTES_LENGTH = "The bytes was received but are not correct (LENGTH)";
 static const char *const SM_STR_CODE_WRONG_BYTES_TYPE_MESSAGE = "The bytes was received but are not correct (TYPE_MESSAGE)";
 static const char *const SM_STR_CODE_WRONG_BYTES_COMMAND = "The bytes was received but are not correct (COMMAND)";
-static const char *const SM_STR_CODE_WRONG_BYTES_VERSION_PROTOCOL = "Tuya Protocol send 0x00 version (VERSION)";
+static const char *const SM_STR_CODE_WRONG_BYTES_VERSION_PROTOCOL = "Tuya Protocol send 0x00 version";
 static const char *const SM_STR_CODE_WRONG_BYTES_VERSION_MESSAGE = "Hekr Protocol invalid version confirmation message";
 
 static const char *const SM_STR_CODE_CRC = "CRC check failed";
@@ -299,11 +238,32 @@ enum class SmCommandType : uint8_t {
 };
 
 #ifdef USE_PROTOCOL_HEKR
+enum class ModuleOperation : uint8_t {
+  STATUS = 0x01,            // status query
+  SOFT_REBOOT = 0x02,       // module soft restart
+  FACTORY_RESET = 0x03,     // Restore Factory
+  CONFIG = 0x04,            // One-key configuration
+  SET_SLEEP = 0x05,         // go to sleep
+  WEAKUP = 0x06,            // wake up from sleep
+  FIRMWARE_VERSION = 0x10,  // version query
+  PRODKEY_GET = 0x11,       // ProdKey query
+  FACTORY_TEST = 0x20,      // enter factory test
+  SET_PRODKEY = 0x21,       // ProdKey setting
+};
+
+enum class ErrorValue : uint8_t {
+  ERROR_OPERATION = 0x01,
+  ERROR_SUM_CHECK = 0x02,
+  ERROR_DATA_RANGE = 0x03,
+  ERROR_CMD_NO_SUPPORTED = 0x04,
+  ERROR_DATA_IS_INCONSISTENT = 0x05,
+};
+
 enum class ResponseType : uint8_t {
-  HEKR_CMD_RECEIVE_METER_STATE = 0x01,
-  HEKR_CMD_RECEIVE_MEASUREMENT = 0x0B,
-  HEKR_CMD_RECEIVE_LIMIT_AND_PURCHASE = 0x08,
-  HEKR_CMD_RECEIVE_METER_ID = 0x07,
+  RECEIVE_METER_STATE = 0x01,
+  RECEIVE_MEASUREMENT = 0x0B,
+  RECEIVE_LIMIT_AND_PURCHASE = 0x08,
+  RECEIVE_METER_ID = 0x07,
 };
 
 enum class CommandData : uint8_t {
@@ -344,6 +304,40 @@ enum class CommandType : uint8_t {
   GET_NETWORK_STATUS = 0x2B,
 };
 
+#ifdef USE_MODEL_DDS238_2
+enum class DatapointId : uint8_t {
+  FREQUENCY = 105,
+  CURRENT = 18,
+  VOLTAGE = 20,
+  POWER_FACTOR = 111,
+
+  REACTIVE_POWER = 110,
+  ACTIVE_POWER = 19,
+
+  IMPORT_ACTIVE_ENERGY = 101,
+  EXPORT_ACTIVE_ENERGY = 9,
+  TOTAL_ENERGY = 204,
+
+  MAX_CURRENT_LIMIT = 206,
+  MAX_VOLTAGE_LIMIT = 207,
+  MIN_VOLTAGE_LIMIT = 208,
+
+  ENERGY_PURCHASE_VALUE = 209,
+  ENERGY_PURCHASE_ALARM = 210,
+  ENERGY_PURCHASE_BALANCE = 203,
+
+  DELAY_VALUE_REMAINING = 205,
+  DELAY_VALUE_SET = 211,
+
+  ENERGY_PURCHASE_STATE = 212,
+  METER_STATE = 1,
+  DELAY_STATE = 213,
+
+  RESET_DATA = 214,
+};
+#endif
+
+#ifdef USE_MODEL_DDS238_4
 enum class DatapointId : uint8_t {
   FREQUENCY = 100,
   CURRENT = 101,
@@ -386,6 +380,7 @@ enum class DatapointId : uint8_t {
   DELAY_STATE = 138,
   RESET_DATA = 139,
 };
+#endif
 
 enum class TuyaDatapointType : uint8_t {
   RAW = 0x00,      // variable length
@@ -424,7 +419,7 @@ struct SmCommand {
 struct MeterData {
   uint32_t energy_purchase_value = 0;
   uint32_t energy_purchase_alarm = 0;
-  uint32_t energy_purchase_balance = 0;  // old float
+  float energy_purchase_balance = 0;
 
   bool energy_purchase_state = false;
 
@@ -637,7 +632,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   int8_t status_pin_reported_ = -1;
   int8_t reset_pin_reported_ = -1;
 
-  uint8_t protocol_version_ = -1;
+  int8_t protocol_version_ = -1;
 
   optional<InternalGPIOPin *> status_pin_{};
 

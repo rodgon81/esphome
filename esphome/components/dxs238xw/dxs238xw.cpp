@@ -564,9 +564,95 @@ void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, 
       break;
     }
     case CommandType::MODULE_OPERATION: {
+      ModuleOperation command_Operation = (ModuleOperation) buffer[0];
+
+      switch (command_Operation) {
+        case ModuleOperation::STATUS: {
+          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = std::vector<uint8_t>{(uint8_t) ModuleOperation::STATUS, 0x01, 0x01, 0x01, 0x05, 0x00}}, PUSH_FRONT);
+
+          break;
+        }
+        case ModuleOperation::SOFT_REBOOT: {
+          ESP_LOGI(TAG, "* Restarting device...");
+
+          delay(100);
+
+          App.safe_reboot();
+
+          break;
+        }
+        case ModuleOperation::FACTORY_RESET: {
+          ESP_LOGE(TAG, "* FACTORY_RESET is not handled");
+
+          break;
+        }
+        case ModuleOperation::CONFIG: {
+          ESP_LOGE(TAG, "* CONFIG is not handled");
+
+          break;
+        }
+        case ModuleOperation::SET_SLEEP: {
+          ESP_LOGE(TAG, "* SET_SLEEP is not handled");
+
+          break;
+        }
+        case ModuleOperation::WEAKUP: {
+          ESP_LOGE(TAG, "* WEAKUP is not handled");
+
+          break;
+        }
+        case ModuleOperation::FIRMWARE_VERSION: {
+          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = std::vector<uint8_t>{(uint8_t) ModuleOperation::FIRMWARE_VERSION, 0x04, 0x01, 0x0F, 0x01}}, PUSH_FRONT);
+
+          break;
+        }
+        case ModuleOperation::PRODKEY_GET: {
+          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = std::vector<uint8_t>{(uint8_t) ModuleOperation::PRODKEY_GET, 0x01}}, PUSH_FRONT);
+
+          break;
+        }
+        case ModuleOperation::FACTORY_TEST: {
+          ESP_LOGE(TAG, "* FACTORY_TEST is not handled");
+
+          break;
+        }
+        case ModuleOperation::SET_PRODKEY: {
+          std::vector<uint8_t> prod_key;
+
+          prod_key.push_back((uint8_t) ModuleOperation::SET_PRODKEY);
+
+          for (uint8_t i = 1; i <= 16; i++) {
+            prod_key.push_back(buffer[i]);
+          }
+
+          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = prod_key}, PUSH_FRONT);
+
+          break;
+        }
+        default:
+          ESP_LOGE(TAG, "* Invalid command operation (0x%02X) received", command_Operation);
+          return;
+      }
+
       break;
     }
     case CommandType::ERROR_FRAME: {
+      ErrorValue command_error = (ErrorValue) buffer[0];
+
+      switch (command_error) {
+        case ErrorValue::ERROR_OPERATION:
+        case ErrorValue::ERROR_SUM_CHECK:
+        case ErrorValue::ERROR_DATA_RANGE:
+        case ErrorValue::ERROR_CMD_NO_SUPPORTED:
+        case ErrorValue::ERROR_DATA_IS_INCONSISTENT:
+          ESP_LOGE(TAG, "Meter send error: 0x%02X", command_error);
+
+          break;
+        default:
+          ESP_LOGE(TAG, "Invalid command error (0x%02X) received", command_error);
+          return;
+      }
+
       break;
     }
     default:
@@ -578,7 +664,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
   ResponseType command_type = (ResponseType) buffer[0];
 
   switch (command_type) {
-    case ResponseType::HEKR_CMD_RECEIVE_METER_STATE: {
+    case ResponseType::RECEIVE_METER_STATE: {
       ESP_LOGV(TAG, "* process_and_update METER_STATE");
 
       this->data_.phase_count = buffer[1];
@@ -652,7 +738,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
 
       break;
     }
-    case ResponseType::HEKR_CMD_RECEIVE_MEASUREMENT: {
+    case ResponseType::RECEIVE_MEASUREMENT: {
       ESP_LOGV(TAG, "* process_and_update MEASUREMENT");
 
       UPDATE_SENSOR_MEASUREMENTS_CURRENT(current, ((buffer[1] << 16) | (buffer[2] << 8) | buffer[3]) * 0.001)
@@ -696,7 +782,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
 
       break;
     }
-    case ResponseType::HEKR_CMD_RECEIVE_LIMIT_AND_PURCHASE: {
+    case ResponseType::RECEIVE_LIMIT_AND_PURCHASE: {
       ESP_LOGV(TAG, "* process_and_update LIMIT_AND_PURCHASE");
 
       this->data_.max_voltage_limit = (buffer[1] << 8) | buffer[2];
@@ -728,7 +814,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
 
       break;
     }
-    case ResponseType::HEKR_CMD_RECEIVE_METER_ID: {
+    case ResponseType::RECEIVE_METER_ID: {
       ESP_LOGV(TAG, "* process_and_update METER_ID");
 
       char serial_number[20];
@@ -2269,31 +2355,36 @@ std::string Dxs238xwComponent::base64_encode_(const uint8_t *buf, size_t bufLen)
     char_array_3[i++] = *(buf++);
 
     if (i == 3) {
-      char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-      char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-      char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-      char_array_4[3] = char_array_3[2] & 0x3f;
+      char_array_4[0] = (char_array_3[0] & 0xFC) >> 2;
+      char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xF0) >> 4);
+      char_array_4[2] = ((char_array_3[1] & 0x0F) << 2) + ((char_array_3[2] & 0xC0) >> 6);
+      char_array_4[3] = char_array_3[2] & 0x3F;
 
-      for (i = 0; (i < 4); i++)
+      for (i = 0; (i < 4); i++) {
         ret += base64_chars[char_array_4[i]];
+      }
+
       i = 0;
     }
   }
 
   if (i) {
-    for (j = i; j < 3; j++)
+    for (j = i; j < 3; j++) {
       char_array_3[j] = '\0';
+    }
 
-    char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-    char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-    char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-    char_array_4[3] = char_array_3[2] & 0x3f;
+    char_array_4[0] = (char_array_3[0] & 0xFC) >> 2;
+    char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xF0) >> 4);
+    char_array_4[2] = ((char_array_3[1] & 0x0F) << 2) + ((char_array_3[2] & 0xC0) >> 6);
+    char_array_4[3] = char_array_3[2] & 0x3F;
 
-    for (j = 0; (j < i + 1); j++)
+    for (j = 0; (j < i + 1); j++) {
       ret += base64_chars[char_array_4[j]];
+    }
 
-    while ((i++ < 3))
+    while ((i++ < 3)) {
       ret += '=';
+    }
   }
 
   return ret;
@@ -2312,32 +2403,38 @@ std::vector<uint8_t> Dxs238xwComponent::base64_decode_(const std::string &encode
     in_++;
 
     if (i == 4) {
-      for (i = 0; i < 4; i++)
+      for (i = 0; i < 4; i++) {
         char_array_4[i] = base64_chars.find(char_array_4[i]);
+      }
 
       char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-      char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+      char_array_3[1] = ((char_array_4[1] & 0xF) << 4) + ((char_array_4[2] & 0x3C) >> 2);
       char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
 
-      for (i = 0; (i < 3); i++)
+      for (i = 0; (i < 3); i++) {
         ret.push_back(char_array_3[i]);
+      }
+
       i = 0;
     }
   }
 
   if (i) {
-    for (j = i; j < 4; j++)
+    for (j = i; j < 4; j++) {
       char_array_4[j] = 0;
+    }
 
-    for (j = 0; j < 4; j++)
+    for (j = 0; j < 4; j++) {
       char_array_4[j] = base64_chars.find(char_array_4[j]);
+    }
 
     char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-    char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+    char_array_3[1] = ((char_array_4[1] & 0xF) << 4) + ((char_array_4[2] & 0x3C) >> 2);
     char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
 
-    for (j = 0; (j < i - 1); j++)
+    for (j = 0; (j < i - 1); j++) {
       ret.push_back(char_array_3[j]);
+    }
   }
 
   return ret;
