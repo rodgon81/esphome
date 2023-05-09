@@ -86,6 +86,8 @@ static const uint8_t SM_MIN_COMMAND_LENGHT = 7;
 static const uint16_t SM_MIN_INTERVAL_TO_GET_DATA = 500;
 static const uint8_t SM_MAX_MILLIS_TO_RX_BYTE = 50;
 
+static const uint8_t SM_COMMAND_DELAY = 50;
+
 static const uint8_t SM_MAX_HEX_MSG_LENGTH = 255;
 
 static const uint8_t SM_GET_ONE_BYTE = 0xFF;
@@ -414,6 +416,7 @@ struct SmCommand {
   std::vector<uint8_t> payload = std::vector<uint8_t>{};
   bool null_old_response = false;
   bool raw = false;
+  bool priority_cmd = false;
 };
 
 struct MeterData {
@@ -702,7 +705,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void process_command_queue_();
   void send_raw_command_(SmCommand command);
 
-  void push_command_(const SmCommand &command, bool push_back);
+  void push_command_(const SmCommand &command);
   void send_command_(SmCommandType cmd, bool state = false);
 
   bool is_expected_message();

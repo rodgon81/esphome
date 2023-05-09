@@ -213,7 +213,7 @@ void Dxs238xwComponent::setup() {
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
-    this->set_interval("heartbeat", 1000, [this] { this->push_command_(SmCommand{.cmd = CommandType::HEARTBEAT}, PUSH_BACK); });
+    this->set_interval("heartbeat", 1000, [this] { this->push_command_(SmCommand{.cmd = CommandType::HEARTBEAT}); });
 
     if (this->status_pin_.has_value()) {
       this->status_pin_.value()->digital_write(false);
@@ -568,7 +568,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, 
 
       switch (command_Operation) {
         case ModuleOperation::STATUS: {
-          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = std::vector<uint8_t>{(uint8_t) ModuleOperation::STATUS, 0x01, 0x01, 0x01, 0x05, 0x00}}, PUSH_FRONT);
+          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = std::vector<uint8_t>{(uint8_t) ModuleOperation::STATUS, 0x01, 0x01, 0x01, 0x05, 0x00}, .priority_cmd = true});
 
           break;
         }
@@ -602,12 +602,12 @@ void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, 
           break;
         }
         case ModuleOperation::FIRMWARE_VERSION: {
-          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = std::vector<uint8_t>{(uint8_t) ModuleOperation::FIRMWARE_VERSION, 0x04, 0x01, 0x0F, 0x01}}, PUSH_FRONT);
+          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = std::vector<uint8_t>{(uint8_t) ModuleOperation::FIRMWARE_VERSION, 0x04, 0x01, 0x0F, 0x01}, .priority_cmd = true});
 
           break;
         }
         case ModuleOperation::PRODKEY_GET: {
-          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = std::vector<uint8_t>{(uint8_t) ModuleOperation::PRODKEY_GET, 0x01}}, PUSH_FRONT);
+          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = std::vector<uint8_t>{(uint8_t) ModuleOperation::PRODKEY_GET, 0x01}, .priority_cmd = true});
 
           break;
         }
@@ -625,7 +625,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, 
             prod_key.push_back(buffer[i]);
           }
 
-          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = prod_key}, PUSH_FRONT);
+          this->push_command_(SmCommand{.cmd = CommandType::MODULE_OPERATION, .payload = prod_key, .priority_cmd = true});
 
           break;
         }
@@ -863,7 +863,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       if (this->init_state_ == TuyaInitState::INIT_HEARTBEAT) {
         this->init_state_ = TuyaInitState::INIT_PRODUCT;
 
-        this->push_command_(SmCommand{.cmd = CommandType::PRODUCT_QUERY}, PUSH_BACK);
+        this->push_command_(SmCommand{.cmd = CommandType::PRODUCT_QUERY});
       }
 
       break;
@@ -888,7 +888,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       if (this->init_state_ == TuyaInitState::INIT_PRODUCT) {
         this->init_state_ = TuyaInitState::INIT_CONF;
 
-        this->push_command_(SmCommand{.cmd = CommandType::CONF_QUERY}, PUSH_BACK);
+        this->push_command_(SmCommand{.cmd = CommandType::CONF_QUERY});
       }
 
       break;
@@ -903,7 +903,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
         // If mcu returned status gpio, then we can omit sending wifi state
         if (this->status_pin_reported_ != -1) {
           this->init_state_ = TuyaInitState::INIT_DATAPOINT;
-          this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY}, PUSH_BACK);
+          this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY});
 
           bool is_pin_equals = this->status_pin_.has_value() && (this->status_pin_.value()->get_pin() == this->status_pin_reported_);
 
@@ -930,7 +930,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       if (this->init_state_ == TuyaInitState::INIT_WIFI) {
         this->init_state_ = TuyaInitState::INIT_DATAPOINT;
 
-        this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY}, PUSH_BACK);
+        this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY});
       }
 
       break;
@@ -963,12 +963,12 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       break;
     }
     case CommandType::WIFI_TEST: {
-      this->push_command_(SmCommand{.cmd = CommandType::WIFI_TEST, .payload = std::vector<uint8_t>{0x00, 0x00}}, PUSH_BACK);
+      this->push_command_(SmCommand{.cmd = CommandType::WIFI_TEST, .payload = std::vector<uint8_t>{0x00, 0x00}});
 
       break;
     }
     case CommandType::WIFI_RSSI: {
-      this->push_command_(SmCommand{.cmd = CommandType::WIFI_RSSI, .payload = std::vector<uint8_t>{get_wifi_rssi_()}}, PUSH_BACK);
+      this->push_command_(SmCommand{.cmd = CommandType::WIFI_RSSI, .payload = std::vector<uint8_t>{get_wifi_rssi_()}});
 
       break;
     }
@@ -991,7 +991,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
     case CommandType::GET_NETWORK_STATUS: {
       uint8_t wifi_status = this->get_wifi_status_code_();
 
-      this->push_command_(SmCommand{.cmd = CommandType::GET_NETWORK_STATUS, .payload = std::vector<uint8_t>{wifi_status}}, PUSH_BACK);
+      this->push_command_(SmCommand{.cmd = CommandType::GET_NETWORK_STATUS, .payload = std::vector<uint8_t>{wifi_status}});
 
       ESP_LOGV(TAG, "Network status requested, reported as %i", wifi_status);
 
@@ -1261,7 +1261,7 @@ void Dxs238xwComponent::send_datapoint_command_(DatapointId datapoint_id, TuyaDa
 
   buffer.insert(buffer.end(), data.begin(), data.end());
 
-  this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_DELIVER, .payload = buffer}, PUSH_BACK);
+  this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_DELIVER, .payload = buffer});
 }
 
 optional<TuyaDatapoint> Dxs238xwComponent::get_datapoint_(DatapointId datapoint_id) {
@@ -1425,7 +1425,12 @@ void Dxs238xwComponent::process_command_queue_() {  // XXXXXXXXXXXXXXXXXXXXXXXXX
   // verificamos si no hemos superado el tiempo de espera para resivir una respuesta
   // si superamos el tiempo podemos seguir procesando mensajes en cola
   if (this->is_message_timeout_()) {
-    ESP_LOGW(TAG, "* Se agoto el tiempo de espera para confirmacion o respuesta");
+    if (this->command_queue_.front().payload.empty()) {
+      ESP_LOGW(TAG, "* Se agoto el tiempo de espera para confirmacion o respuesta comand = %02X", this->command_queue_.front().cmd);
+
+    } else {
+      ESP_LOGW(TAG, "* Se agoto el tiempo de espera para confirmacion o respuesta comand = %02X/%02X", this->command_queue_.front().cmd, this->command_queue_.front().payload[0]);
+    }
 
     /*
         if (init_state_ != TuyaInitState::INIT_DONE) {
@@ -1458,7 +1463,7 @@ void Dxs238xwComponent::process_command_queue_() {  // XXXXXXXXXXXXXXXXXXXXXXXXX
     this->print_error_();
   }
 
-  if (!this->command_queue_.empty() && this->rx_message_.empty() && !this->is_expected_message()) {
+  if ((now - this->last_command_timestamp_) > SM_COMMAND_DELAY && !this->command_queue_.empty() && this->rx_message_.empty() && !this->is_expected_message()) {
     this->send_raw_command_(this->command_queue_.front());
 
     // El comando se queda retenido si es necesario esperar una respuesta, si no se elimina del listado
@@ -1563,19 +1568,15 @@ void Dxs238xwComponent::send_raw_command_(SmCommand command) {
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 
-void Dxs238xwComponent::push_command_(const SmCommand &command, bool push_back) {
+void Dxs238xwComponent::push_command_(const SmCommand &command) {
   uint8_t index = 0;
 
   // Buscamos si es que ya existe el mensaje
   for (auto &cmd : this->command_queue_) {
     if (cmd.cmd == command.cmd) {
       if (cmd.payload.empty() && command.payload.empty()) {
-        // descartamos el comando ya que esxiste uno igual en el listado
-        if (command.raw) {
-          ESP_LOGD(TAG, "* Descartamos el comando por estar repetido %02X", command.cmd);
-        } else {
-          ESP_LOGV(TAG, "* Descartamos el comando por estar repetido %02X", command.cmd);
-        }
+        ESP_LOGV(TAG, "* Descartamos el comando por estar repetido %02X", command.cmd);
+
         return;
       } else {
         bool replaced = false;
@@ -1587,12 +1588,7 @@ void Dxs238xwComponent::push_command_(const SmCommand &command, bool push_back) 
             if (this->is_expected_message()) {
               // Si tiene payload comparamos si es distinto el dato guardado al nuevo comando
               if (cmd.payload == command.payload) {
-                // descartamos el mensaje
-                if (command.raw) {
-                  ESP_LOGD(TAG, "* Descartamos el comando por estar repetido %02X-%02X", command.cmd, command.payload.front());
-                } else {
-                  ESP_LOGV(TAG, "* Descartamos el comando por estar repetido %02X-%02X", command.cmd, command.payload.front());
-                }
+                ESP_LOGV(TAG, "* Descartamos el comando por estar repetido %02X-%02X", command.cmd, command.payload.front());
 
                 return;
               } else {
@@ -1610,30 +1606,16 @@ void Dxs238xwComponent::push_command_(const SmCommand &command, bool push_back) 
           if (replaced) {
             cmd = command;
 
-            if (command.raw) {
-              ESP_LOGD(TAG, "* Command exist in queue, is replaced with new command %02X-%02X", command.cmd, command.payload.front());
+            ESP_LOGV(TAG, "* Command exist in queue, is replaced with new command %02X-%02X", command.cmd, command.payload.front());
 
-              if (null_response) {
-                cmd.null_old_response = true;
+            if (null_response) {
+              cmd.null_old_response = true;
 
-                ESP_LOGD(TAG, "* Se anula la respuesta en espera %02X-%02X", command.cmd, command.payload.front());
-              }
-
-            } else {
-              ESP_LOGV(TAG, "* Command exist in queue, is replaced with new command %02X-%02X", command.cmd, command.payload.front());
-
-              if (null_response) {
-                cmd.null_old_response = true;
-
-                ESP_LOGV(TAG, "* Se anula la respuesta en espera %02X-%02X", command.cmd, command.payload.front());
-              }
+              ESP_LOGV(TAG, "* Se anula la respuesta en espera %02X-%02X", command.cmd, command.payload.front());
             }
+
           } else {
-            if (command.raw) {
-              ESP_LOGD(TAG, "* Command exist in queue, se descarta nuevo mensaje %02X-%02X", command.cmd, command.payload.front());
-            } else {
-              ESP_LOGV(TAG, "* Command exist in queue, se descarta nuevo mensaje %02X-%02X", command.cmd, command.payload.front());
-            }
+            ESP_LOGV(TAG, "* Command exist in queue, se descarta nuevo mensaje %02X-%02X", command.cmd, command.payload.front());
           }
 
           return;
@@ -1644,16 +1626,56 @@ void Dxs238xwComponent::push_command_(const SmCommand &command, bool push_back) 
     index++;
   }
 
-  ESP_LOGV(TAG, "* Agregamos el comando en la lista 0x%02X-0x%02X", command.cmd, command.payload.front());
+  if (command.priority_cmd) {
+    if (this->command_queue_.empty()) {
+      ESP_LOGV(TAG, "* Comando prioritario agregado a lista vacia: 1° lugar - 0x%02X-0x%02X", command.cmd, command.payload.front());
 
-  if (push_back) {
-    command_queue_.push_back(command);
-  } else {
-    if (this->is_expected_message()) {
-      this->command_queue_.insert(this->command_queue_.begin() + 1, command);
+      command_queue_.push_back(command);
     } else {
-      this->command_queue_.insert(this->command_queue_.begin(), command);
+      index = 0;
+
+      for (auto &cmd_ex : this->command_queue_) {
+        if (cmd_ex.priority_cmd) {
+          if (index == (this->command_queue_.size() - 1)) {
+            ESP_LOGV(TAG, "* Comando prioritario agregado despues de otros prioritarios: %u° lugar - 0x%02X-0x%02X", index + 1, command.cmd, command.payload.front());
+
+            command_queue_.push_back(command);
+
+            return;
+          }
+        } else {
+          if (index == 0) {
+            if (this->is_expected_message()) {
+              if (this->command_queue_.size() == 1) {
+                ESP_LOGV(TAG, "* Comando prioritario agregado despues de mensaje en proceso: 2° lugar - 0x%02X-0x%02X", command.cmd, command.payload.front());
+
+                command_queue_.push_back(command);
+
+                return;
+              }
+            } else {
+              ESP_LOGV(TAG, "* Comando prioritario agregado: 1° lugar - 0x%02X-0x%02X", command.cmd, command.payload.front());
+
+              this->command_queue_.insert(this->command_queue_.begin(), command);
+
+              return;
+            }
+          } else {
+            ESP_LOGV(TAG, "* Comando prioritario agregado despues de otros prioritarios: %u° lugar - 0x%02X-0x%02X", index + 1, command.cmd, command.payload.front());
+
+            this->command_queue_.insert(this->command_queue_.begin() + index, command);
+
+            return;
+          }
+        }
+
+        index++;
+      }
     }
+  } else {
+    ESP_LOGV(TAG, "* Comando normal agregado al final de la lista: %u° lugar - 0x%02X-0x%02X", this->command_queue_.size() + 1, command.cmd, command.payload.front());
+
+    command_queue_.push_back(command);
   }
 }
 
@@ -1663,7 +1685,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
       ESP_LOGV(TAG, "Push Command - GET_METER_STATE");
 
 #ifdef USE_PROTOCOL_HEKR
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_METER_STATE}}, PUSH_BACK);
+      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_METER_STATE}});
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
@@ -1676,7 +1698,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
       ESP_LOGV(TAG, "Push Command - GET_MEASUREMENT");
 
 #ifdef USE_PROTOCOL_HEKR
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_MEASUREMENT}}, PUSH_BACK);
+      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_MEASUREMENT}});
 #endif
       break;
     }
@@ -1684,7 +1706,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
       ESP_LOGV(TAG, "Push Command - GET_LIMIT_AND_PURCHASE");
 
 #ifdef USE_PROTOCOL_HEKR
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_LIMIT_AND_PURCHASE}}, PUSH_BACK);
+      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_LIMIT_AND_PURCHASE}});
 #endif
       break;
     }
@@ -1692,7 +1714,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
       ESP_LOGD(TAG, "Push Command - GET_METER_ID");
 
 #ifdef USE_PROTOCOL_HEKR
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_METER_ID}}, PUSH_BACK);
+      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_METER_ID}});
 #endif
       break;
     }
@@ -1715,7 +1737,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
       buffer.push_back(this->data_.min_voltage_limit >> 8);
       buffer.push_back(this->data_.min_voltage_limit & SM_GET_ONE_BYTE);
 
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer}, PUSH_FRONT);
+      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer, .priority_cmd = true});
 #endif
       ESP_LOGD(TAG, "* Input Data: max_current_limit = %u, max_voltage_limit = %u, min_voltage_limit = %u", this->data_.max_current_limit, this->data_.max_voltage_limit, this->data_.min_voltage_limit);
 
@@ -1749,7 +1771,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
 
       buffer.push_back(state);
 
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer}, PUSH_FRONT);
+      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer, .priority_cmd = true});
 #endif
       ESP_LOGD(TAG, "* Input Data: purchase_value = %u, purchase_alarm = %u, state = %s", (state ? this->data_.energy_purchase_value : 0), (state ? this->data_.energy_purchase_alarm : 0), ONOFF(state));
 
@@ -1764,7 +1786,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
       buffer.push_back((uint8_t) CommandData::SET_METER_STATE);
       buffer.push_back(state);
 
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer}, PUSH_FRONT);
+      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer, .priority_cmd = true});
 #endif
       ESP_LOGD(TAG, "* Input Data: state = %s", ONOFF(state));
 
@@ -1789,7 +1811,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
 
       buffer.push_back(state);
 
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer}, PUSH_FRONT);
+      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer, .priority_cmd = true});
 #endif
       ESP_LOGD(TAG, "* Input Data: delay_value_set = %u, state = %s", delay_value_set, ONOFF(state));
 
@@ -1799,7 +1821,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
       ESP_LOGD(TAG, "Push Command - SET_RESET");
 
 #ifdef USE_PROTOCOL_HEKR
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::SET_RESET}}, PUSH_FRONT);
+      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::SET_RESET}, .priority_cmd = true});
 #endif
       break;
     }
@@ -1917,7 +1939,7 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
               message_hex.erase(message_hex.begin(), message_hex.begin() + 4);
               message_hex.pop_back();
 
-              this->push_command_(SmCommand{.cmd = command, .payload = message_hex, .raw = true}, PUSH_FRONT);
+              this->push_command_(SmCommand{.cmd = command, .payload = message_hex, .raw = true, .priority_cmd = true});
             }
 #endif
 
@@ -1937,12 +1959,12 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
               CommandType command = (CommandType) message_hex[3];
 
               if (message_hex_size == SM_MIN_COMMAND_LENGHT) {
-                this->push_command_(SmCommand{.cmd = command, .raw = true}, PUSH_FRONT);
+                this->push_command_(SmCommand{.cmd = command, .raw = true, .priority_cmd = true});
               } else {
                 message_hex.erase(message_hex.begin(), message_hex.begin() + 6);
                 message_hex.pop_back();
 
-                this->push_command_(SmCommand{.cmd = command, .payload = message_hex, .raw = true}, PUSH_FRONT);
+                this->push_command_(SmCommand{.cmd = command, .payload = message_hex, .raw = true, .priority_cmd = true});
               }
             }
 #endif
