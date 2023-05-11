@@ -9,6 +9,14 @@
 #include "esphome/components/time/real_time_clock.h"
 #endif
 
+#ifdef USE_WIFI
+#include "esphome/components/wifi/wifi_component.h"
+#endif
+
+#ifdef USE_CAPTIVE_PORTAL
+#include "esphome/components/captive_portal/captive_portal.h"
+#endif
+
 namespace esphome {
 namespace dxs238xw {
 
@@ -92,8 +100,7 @@ static const uint8_t SM_MAX_HEX_MSG_LENGTH = 255;
 
 static const uint8_t SM_GET_ONE_BYTE = 0xFF;
 
-static const bool PUSH_BACK = true;
-static const bool PUSH_FRONT = false;
+static const uint8_t SM_MAX_RETRIES = 5;
 
 //------------------------------------------------------------------------------
 
@@ -139,6 +146,30 @@ static const char *const SM_STR_ENERGY_PURCHASE_ALARM = "energy_purchase_alarm";
 static const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                         "abcdefghijklmnopqrstuvwxyz"
                                         "0123456789+/";
+
+enum class SmInitState : uint8_t {
+  INIT_PRE_SETUP = 0,
+  INIT_CONNECTED,
+  INIT_GET_PREFERENCES,
+
+#ifdef USE_PROTOCOL_HEKR
+  INIT_GET_METER_ID,
+  INIT_GET_METER_STATE,
+  INIT_GET_LIMIT_AND_PURCHASE,
+  INIT_GET_MEASUREMENT,
+#endif
+
+#ifdef USE_PROTOCOL_TUYA
+  INIT_HEARTBEAT,
+  INIT_PRODUCT,
+  INIT_CONF,
+  INIT_WIFI,
+  INIT_DATAPOINT,
+#endif
+
+  INIT_ERROR,
+  INIT_DONE,
+};
 
 enum class SmErrorMeterStateType : uint8_t {
   POWER_OK,
@@ -215,15 +246,6 @@ enum SmLimitValue : uint32_t {
   MIN_PRICE_KWH = 0,                   // $
   MAX_PRICE_KWH = 999999,              // $
   STEP_PRICE_KWH = 0,                  // Unit
-};
-
-enum class TuyaInitState : uint8_t {
-  INIT_HEARTBEAT = 0x00,
-  INIT_PRODUCT,
-  INIT_CONF,
-  INIT_WIFI,
-  INIT_DATAPOINT,
-  INIT_DONE,
 };
 
 enum class SmCommandType : uint8_t {
@@ -606,19 +628,16 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void process_number_value(SmIdEntity entity, float value);
 
  protected:
-  bool load_preferences = false;
-
-  uint32_t postpone_setup_time_ = 0;
-  uint8_t index_first_command = 0;
-
-  TuyaInitState init_state_ = TuyaInitState::INIT_HEARTBEAT;
+  SmInitState init_state_ = SmInitState::INIT_PRE_SETUP;
 
   uint32_t last_command_timestamp_ = 0;
   uint32_t last_rx_char_timestamp_ = 0;
 
-  uint32_t count_error_data_acquisition_ = 0;
-
   uint8_t wifi_status_ = -1;
+
+  uint8_t init_retries_ = 0;
+
+  uint32_t time_init_connected = 0;
 
 #ifdef USE_PROTOCOL_HEKR
   uint8_t version_msg = 0;
@@ -629,8 +648,6 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
 #ifdef USE_PROTOCOL_TUYA
   std::string product_ = "";
-
-  bool init_failed_ = false;
 
   int8_t status_pin_reported_ = -1;
   int8_t reset_pin_reported_ = -1;
@@ -666,7 +683,6 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
-  bool first_data_acquisition_();
   void incoming_messages_();
   bool validate_message_();
 
