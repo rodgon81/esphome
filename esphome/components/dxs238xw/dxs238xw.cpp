@@ -178,8 +178,12 @@ void Dxs238xwComponent::setup() {
       UPDATE_NUMBER(energy_purchase_value, this->data_.energy_purchase_value)
       UPDATE_NUMBER(energy_purchase_alarm, this->data_.energy_purchase_alarm)
 
+#ifdef USE_PROTOCOL_HEKR
       this->init_state_ = SmInitState::INIT_GET_METER_ID;
-
+#endif
+#ifdef USE_PROTOCOL_TUYA
+      this->init_state_ = SmInitState::INIT_HEARTBEAT;
+#endif
       break;
 
 #ifdef USE_PROTOCOL_HEKR
@@ -213,7 +217,50 @@ void Dxs238xwComponent::setup() {
       break;
 #endif
 
+#ifdef USE_PROTOCOL_TUYA
+    case SmInitState::INIT_HEARTBEAT:
+      if (!this->is_expected_message()) {
+        ESP_LOGI(TAG, "* Try to get HEARTBEAT");
+        this->push_command_(SmCommand{.cmd = CommandType::HEARTBEAT});
+      }
+
+      break;
+    case SmInitState::INIT_PRODUCT_QUERY:
+      if (!this->is_expected_message()) {
+        ESP_LOGI(TAG, "* Try to get PRODUCT_QUERY");
+        this->push_command_(SmCommand{.cmd = CommandType::PRODUCT_QUERY});
+      }
+
+      break;
+    case SmInitState::INIT_WORKING_MODE_QUERY:
+      if (!this->is_expected_message()) {
+        ESP_LOGI(TAG, "* Try to get WORKING_MODE_QUERY");
+        this->push_command_(SmCommand{.cmd = CommandType::WORKING_MODE_QUERY});
+      }
+
+      break;
+    case SmInitState::INIT_WIFI_STATE:
+      if (!this->is_expected_message()) {
+        ESP_LOGI(TAG, "* Try to set WIFI_STATE");
+
+        uint8_t wifi_state = (this->protocol_version_ >= 0x03 ? 0x04 : 0x03);
+
+        this->push_command_(SmCommand{.cmd = CommandType::WIFI_STATE, .payload = std::vector<uint8_t>{wifi_state}});
+      }
+
+      break;
+    case SmInitState::INIT_DATAPOINT_QUERY:
+      if (!this->is_expected_message()) {
+        ESP_LOGI(TAG, "* Try to get DATAPOINT_QUERY");
+        this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY});
+      }
+
+      break;
+#endif
+
     case SmInitState::INIT_ERROR:
+      ESP_LOGI(TAG, "* Estas seguro de que el protocolo selecionado (%s) es correcto?", SM_STR_PROTOCOL);
+
       this->mark_failed();
 
       return;
@@ -228,14 +275,12 @@ void Dxs238xwComponent::setup() {
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
-      this->set_interval("heartbeat", 1000, [this] { this->push_command_(SmCommand{.cmd = CommandType::HEARTBEAT}); });
+      this->set_interval(heartbeat_interval_str_, 15000, [this] { this->push_command_(SmCommand{.cmd = CommandType::HEARTBEAT}); });
 
-      if (this->status_pin_.has_value()) {
-        this->status_pin_.value()->digital_write(false);
-      }
+      this->show_info_datapoints_();
 #endif
 
-      this->set_interval("log_command_queue", 2000, [this] {
+      this->set_interval(log_command_queue_str_, 2000, [this] {
         if (this->command_queue_.size() >= 5) {
           ESP_LOGW(TAG, "Comandos en cola anormalmente aumentados %u", this->command_queue_.size());
         }
@@ -353,23 +398,6 @@ bool Dxs238xwComponent::validate_message_() {
     return true;
   }
 
-  uint8_t calc_checksum = this->calculate_crc_(this->rx_message_.data(), at);
-
-  if (new_byte != calc_checksum) {
-    ESP_LOGW(TAG, "* WRONG_BYTES: CRC / Expected = %02X, Receive = %02X", calc_checksum, new_byte);
-    this->error_code_ = SmErrorCode::CRC;
-    return false;
-  }
-
-  const uint8_t *message_data = data + 4;
-  uint8_t length_data = length - 5;
-
-  if (!this->is_expected_message() || this->command_queue_.front().raw) {
-    ESP_LOGI(TAG, "* Incoming message: %s", format_hex_pretty(this->rx_message_).c_str());
-  }
-
-  this->handle_command_(command, message_data, length_data);
-
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
@@ -384,7 +412,6 @@ bool Dxs238xwComponent::validate_message_() {
     }
   }
 
-  // Byte 1: HEADER2 (always 0xAA)
   if (at == 1) {
     if (new_byte == TUYA_HEADER_2) {
       return true;
@@ -395,13 +422,11 @@ bool Dxs238xwComponent::validate_message_() {
     }
   }
 
-  // Byte 2: VERSION, no validation for the following fields:
   uint8_t version = data[2];
   if (at == 2) {
     return true;
   }
 
-  // Byte 3: COMMAND
   uint8_t command = data[3];
   if (at == 3) {
     return true;
@@ -410,7 +435,6 @@ bool Dxs238xwComponent::validate_message_() {
   // Byte 4: LENGTH1
   // Byte 5: LENGTH2
   if (at <= 5) {
-    // no validation for these fields
     return true;
   }
 
@@ -421,6 +445,8 @@ bool Dxs238xwComponent::validate_message_() {
     return true;
   }
 
+#endif
+
   uint8_t calc_checksum = this->calculate_crc_(this->rx_message_.data(), at);
 
   if (new_byte != calc_checksum) {
@@ -429,17 +455,18 @@ bool Dxs238xwComponent::validate_message_() {
     return false;
   }
 
-  // valid message
-  const uint8_t *message_data = data + 6;
-
   if (!this->is_expected_message() || this->command_queue_.front().raw) {
-    ESP_LOGI(TAG, "Hex Message: %s", format_hex_pretty(this->rx_message_).c_str());
-
-    ESP_LOGI(TAG, "* incoming message: CMD=0x%02X VERSION=%u DATA=[%s] INIT_STATE=%u", command, version, format_hex_pretty(message_data, length).c_str(), static_cast<uint8_t>(this->init_state_));
+    ESP_LOGI(TAG, "* Incoming message: %s", format_hex_pretty(this->rx_message_).c_str());
   }
 
-  this->handle_command_(command, version, message_data, length);
+#ifdef USE_PROTOCOL_HEKR
+  const uint8_t *message_data = data + 4;
+  this->handle_command_(command, message_data, length - 5);
+#endif
 
+#ifdef USE_PROTOCOL_TUYA
+  const uint8_t *message_data = data + 6;
+  this->handle_command_(command, version, message_data, length);
 #endif
 
   // return false to reset rx buffer
@@ -496,10 +523,8 @@ void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, 
 
       this->expected_response_.reset();
 
-      bool is_null_old_response = this->command_queue_.front().null_old_response;
-
       // comprobamos si no se declaro el mensaje nulo
-      if (is_null_old_response) {
+      if (this->command_queue_.front().null_old_response) {
         ESP_LOGI(TAG, "* Anulamos respuesta recibida, ya que llego un comando mas actualizado 0x%02X-0x%02X", command_type, buffer[0]);
 
         // procesamos otra vez el mensaje con los datos actualizados.
@@ -630,7 +655,11 @@ void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, 
       break;
     }
     default:
-      ESP_LOGE(TAG, "Invalid command (0x%02X) received", command);
+      if (len == 0) {
+        ESP_LOGE(TAG, "Command (0x%02X) is not handled", command);
+      } else {
+        ESP_LOGE(TAG, "Command (0x%02X) is not handled - Data: %s", command, format_hex_pretty(buffer, len).c_str());
+      }
   }
 }
 
@@ -837,31 +866,69 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
 void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const uint8_t *buffer, size_t len) {
   CommandType command_type = (CommandType) command;
 
-  if (this->expected_response_.has_value() && this->expected_response_ == command_type) {
-    this->expected_response_.reset();
+  if (this->expected_response_.has_value()) {
+    if (this->expected_response_ == command_type) {
+      if (this->command_queue_.front().raw) {
+        ESP_LOGD(TAG, "* Successful response");
+      } else {
+        ESP_LOGV(TAG, "* Successful response");
+      }
 
-    // Liberamos el mensaje retenido y lo borramos ya que si resivio respuesta
-    this->command_queue_.erase(command_queue_.begin());
+      this->expected_response_.reset();
 
-    this->init_retries_ = 0;
+      // comprobamos si no se declaro el mensaje nulo
+      if (this->command_queue_.front().null_old_response) {
+        ESP_LOGI(TAG, "* Anulamos respuesta recibida, ya que llego un comando mas actualizado 0x%02X-0x%02X", command_type, buffer[0]);
+
+        // procesamos otra vez el mensaje con los datos actualizados.
+        this->command_queue_.front().null_old_response = false;
+
+        return;
+      } else {
+        // Liberamos el mensaje retenido y lo borramos ya que si resivio respuesta
+        this->command_queue_.erase(this->command_queue_.begin());
+      }
+
+      this->init_retries_ = 0;
+    } else {
+      if (this->command_queue_.front().raw) {
+        ESP_LOGD(TAG, "* Failed response");
+      } else {
+        ESP_LOGV(TAG, "* Failed response");
+      }
+
+      ESP_LOGW(TAG, "* WRONG_BYTES: HEKR_COMMAND / Expected = %02X, Receive = %02X", this->expected_response_.value(), command);
+
+      this->error_type_ = SmErrorType::COMMUNICATION_RESPONSE;
+      this->error_code_ = SmErrorCode::WRONG_BYTES_COMMAND;
+
+      this->expected_response_.reset();
+      this->command_queue_.erase(this->command_queue_.begin());
+
+      this->print_error_();
+    }
   }
 
   switch (command_type) {
     case CommandType::HEARTBEAT: {
       ESP_LOGV(TAG, "MCU Heartbeat (0x%02X)", buffer[0]);
 
-      this->protocol_version_ = version;
-
       if (buffer[0] == 0x00) {
         ESP_LOGI(TAG, "MCU restarted");
 
         this->init_state_ = SmInitState::INIT_HEARTBEAT;
+
+        this->cancel_interval(heartbeat_interval_str_);
+        this->cancel_interval(log_command_queue_str_);
+
+        this->component_state_ &= ~COMPONENT_STATE_MASK;
+        this->component_state_ |= COMPONENT_STATE_CONSTRUCTION;
       }
 
       if (this->init_state_ == SmInitState::INIT_HEARTBEAT) {
-        this->init_state_ = SmInitState::INIT_PRODUCT;
+        this->protocol_version_ = version;
 
-        this->push_command_(SmCommand{.cmd = CommandType::PRODUCT_QUERY});
+        this->init_state_ = SmInitState::INIT_PRODUCT_QUERY;
       }
 
       break;
@@ -883,81 +950,38 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
         this->product_ = R"({"p":"INVALID"})";
       }
 
-      if (this->init_state_ == SmInitState::INIT_PRODUCT) {
-        this->init_state_ = SmInitState::INIT_CONF;
-
-        this->push_command_(SmCommand{.cmd = CommandType::CONF_QUERY});
+      if (this->init_state_ == SmInitState::INIT_PRODUCT_QUERY) {
+        this->init_state_ = SmInitState::INIT_WORKING_MODE_QUERY;
       }
 
       break;
     }
-    case CommandType::CONF_QUERY: {
+    case CommandType::WORKING_MODE_QUERY: {
       if (len >= 2) {
         this->status_pin_reported_ = buffer[0];
         this->reset_pin_reported_ = buffer[1];
       }
 
-      if (this->init_state_ == SmInitState::INIT_CONF) {
-        // If mcu returned status gpio, then we can omit sending wifi state
-        if (this->status_pin_reported_ != -1) {
-          this->init_state_ = SmInitState::INIT_DATAPOINT;
-          this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY});
-
-          bool is_pin_equals = this->status_pin_.has_value() && (this->status_pin_.value()->get_pin() == this->status_pin_reported_);
-
-          // Configure status pin toggling (if reported and configured) or WIFI_STATE periodic send
-          if (is_pin_equals) {
-            ESP_LOGV(TAG, "Configured status pin %i", this->status_pin_reported_);
-
-            this->set_interval("wifi", 1000, [this] { this->set_status_pin_(); });
-          } else {
-            ESP_LOGW(TAG, "Supplied status_pin does not equals the reported pin %i. TuyaMcu will work in limited mode.", this->status_pin_reported_);
-          }
+      if (this->init_state_ == SmInitState::INIT_WORKING_MODE_QUERY) {
+        if (len >= 2) {
+          this->init_state_ = SmInitState::INIT_DATAPOINT_QUERY;
         } else {
-          this->init_state_ = SmInitState::INIT_WIFI;
-
-          ESP_LOGV(TAG, "Configured WIFI_STATE periodic send");
-
-          this->set_interval("wifi", 1000, [this] { this->send_wifi_status_(); });
+          this->init_state_ = SmInitState::INIT_WIFI_STATE;
         }
       }
 
       break;
     }
     case CommandType::WIFI_STATE: {
-      if (this->init_state_ == SmInitState::INIT_WIFI) {
-        this->init_state_ = SmInitState::INIT_DATAPOINT;
-
-        this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_QUERY});
+      if (this->init_state_ == SmInitState::INIT_WIFI_STATE) {
+        this->init_state_ = SmInitState::INIT_DATAPOINT_QUERY;
       }
 
-      break;
-    }
-    case CommandType::WIFI_RESET: {
-      ESP_LOGE(TAG, "WIFI_RESET is not handled");
-
-      break;
-    }
-    case CommandType::WIFI_SELECT: {
-      ESP_LOGE(TAG, "WIFI_SELECT is not handled");
-
-      break;
-    }
-    case CommandType::DATAPOINT_DELIVER: {
       break;
     }
     case CommandType::DATAPOINT_REPORT: {
-      if (this->init_state_ == SmInitState::INIT_DATAPOINT) {
-        this->init_state_ = SmInitState::INIT_DONE;
-
-        this->set_timeout("datapoint_dump", 1000, [this] { this->show_info_datapoints_(); });
-      }
-
       this->process_and_update_data_(buffer, len);
 
-      break;
-    }
-    case CommandType::DATAPOINT_QUERY: {
       break;
     }
     case CommandType::WIFI_TEST: {
@@ -966,7 +990,7 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       break;
     }
     case CommandType::WIFI_RSSI: {
-      this->push_command_(SmCommand{.cmd = CommandType::WIFI_RSSI, .payload = std::vector<uint8_t>{get_wifi_rssi_()}});
+      this->push_command_(SmCommand{.cmd = CommandType::WIFI_RSSI, .payload = std::vector<uint8_t>{0xEC}});
 
       break;
     }
@@ -987,16 +1011,16 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       break;
     }
     case CommandType::GET_NETWORK_STATUS: {
-      uint8_t wifi_status = this->get_wifi_status_code_();
-
-      this->push_command_(SmCommand{.cmd = CommandType::GET_NETWORK_STATUS, .payload = std::vector<uint8_t>{wifi_status}});
-
-      ESP_LOGV(TAG, "Network status requested, reported as %i", wifi_status);
+      this->push_command_(SmCommand{.cmd = CommandType::GET_NETWORK_STATUS, .payload = std::vector<uint8_t>{0x04}});
 
       break;
     }
     default:
-      ESP_LOGE(TAG, "Invalid command (0x%02X) received", command);
+      if (len == 0) {
+        ESP_LOGE(TAG, "Command (0x%02X) is not handled", command);
+      } else {
+        ESP_LOGE(TAG, "Command (0x%02X) is not handled - Data: %s", command, format_hex_pretty(buffer, len).c_str());
+      }
   }
 }
 
@@ -1107,42 +1131,50 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
       UPDATE_SENSOR_CASE(FREQUENCY, frequency, datapoint.value_uint)
 
       UPDATE_SENSOR_CASE(CURRENT, current, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(CURRENT_PHASE_1, current_phase_1, datapoint.value_uint)
+      /*UPDATE_SENSOR_CASE(CURRENT_PHASE_1, current_phase_1, datapoint.value_uint)
       UPDATE_SENSOR_CASE(CURRENT_PHASE_2, current_phase_2, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(CURRENT_PHASE_3, current_phase_3, datapoint.value_uint)
+      UPDATE_SENSOR_CASE(CURRENT_PHASE_3, current_phase_3, datapoint.value_uint)*/
 
       UPDATE_SENSOR_CASE(VOLTAGE, voltage, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(VOLTAGE_PHASE_1, voltage_phase_1, datapoint.value_uint)
+      /*UPDATE_SENSOR_CASE(VOLTAGE_PHASE_1, voltage_phase_1, datapoint.value_uint)
       UPDATE_SENSOR_CASE(VOLTAGE_PHASE_2, voltage_phase_2, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(VOLTAGE_PHASE_3, voltage_phase_3, datapoint.value_uint)
+      UPDATE_SENSOR_CASE(VOLTAGE_PHASE_3, voltage_phase_3, datapoint.value_uint)*/
 
       UPDATE_SENSOR_CASE(REACTIVE_POWER, reactive_power, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(REACTIVE_POWER_PHASE_1, reactive_power_phase_1, datapoint.value_uint)
+      /*UPDATE_SENSOR_CASE(REACTIVE_POWER_PHASE_1, reactive_power_phase_1, datapoint.value_uint)
       UPDATE_SENSOR_CASE(REACTIVE_POWER_PHASE_2, reactive_power_phase_2, datapoint.value_uint)
       UPDATE_SENSOR_CASE(REACTIVE_POWER_PHASE_3, reactive_power_phase_3, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(REACTIVE_POWER_TOTAL, reactive_power_total, datapoint.value_uint)
+      UPDATE_SENSOR_CASE(REACTIVE_POWER_TOTAL, reactive_power_total, datapoint.value_uint)*/
 
       UPDATE_SENSOR_CASE(ACTIVE_POWER, active_power, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(ACTIVE_POWER_PHASE_1, active_power_phase_1, datapoint.value_uint)
+      /*UPDATE_SENSOR_CASE(ACTIVE_POWER_PHASE_1, active_power_phase_1, datapoint.value_uint)
       UPDATE_SENSOR_CASE(ACTIVE_POWER_PHASE_2, active_power_phase_2, datapoint.value_uint)
       UPDATE_SENSOR_CASE(ACTIVE_POWER_PHASE_3, active_power_phase_3, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(ACTIVE_POWER_TOTAL, active_power_total, datapoint.value_uint)
+      UPDATE_SENSOR_CASE(ACTIVE_POWER_TOTAL, active_power_total, datapoint.value_uint)*/
 
       UPDATE_SENSOR_CASE(POWER_FACTOR, power_factor, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(POWER_FACTOR_PHASE_1, power_factor_phase_1, datapoint.value_uint)
+      /*UPDATE_SENSOR_CASE(POWER_FACTOR_PHASE_1, power_factor_phase_1, datapoint.value_uint)
       UPDATE_SENSOR_CASE(POWER_FACTOR_PHASE_2, power_factor_phase_2, datapoint.value_uint)
       UPDATE_SENSOR_CASE(POWER_FACTOR_PHASE_3, power_factor_phase_3, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(POWER_FACTOR_TOTAL, power_factor_total, datapoint.value_uint)
+      UPDATE_SENSOR_CASE(POWER_FACTOR_TOTAL, power_factor_total, datapoint.value_uint)*/
 
       UPDATE_SENSOR_CASE(IMPORT_ACTIVE_ENERGY, import_active_energy, datapoint.value_uint)
       UPDATE_SENSOR_CASE(EXPORT_ACTIVE_ENERGY, export_active_energy, datapoint.value_uint)
 
-      UPDATE_SENSOR_CASE(PHASE_COUNT, phase_count, datapoint.value_uint)
+      // UPDATE_SENSOR_CASE(PHASE_COUNT, phase_count, datapoint.value_uint)
 
       UPDATE_SENSOR_CASE(ENERGY_PURCHASE_BALANCE, frequency, datapoint.value_uint)
 
       default:
         return;
+    }
+  }
+
+  if (this->init_state_ == SmInitState::INIT_DATAPOINT_QUERY) {
+    if (this->status_has_warning()) {
+      this->init_state_ = SmInitState::INIT_ERROR;
+    } else {
+      this->init_state_ = SmInitState::INIT_DONE;
     }
   }
 }
@@ -1274,19 +1306,6 @@ optional<TuyaDatapoint> Dxs238xwComponent::get_datapoint_(DatapointId datapoint_
 void Dxs238xwComponent::show_info_datapoints_() {
   ESP_LOGCONFIG(TAG, "Datapoints:");
 
-  if (this->init_state_ != SmInitState::INIT_DONE) {
-    /*
-    if (this->init_failed_) {
-      ESP_LOGCONFIG(TAG, "  Initialization failed. Current init_state: %u", static_cast<uint8_t>(this->init_state_));
-    } else {
-      ESP_LOGCONFIG(TAG, "  Configuration will be reported when setup is complete. Current init_state: %u", static_cast<uint8_t>(this->init_state_));
-    }
-*/
-    ESP_LOGCONFIG(TAG, "  If no further output is received, confirm that this is a supported Tuya device.");
-
-    return;
-  }
-
   for (auto &info : this->datapoints_) {
     if (info.type == TuyaDatapointType::RAW) {
       ESP_LOGCONFIG(TAG, "* Datapoint %u: raw (value: %s)", info.id, format_hex_pretty(info.value_raw).c_str());
@@ -1309,64 +1328,10 @@ void Dxs238xwComponent::show_info_datapoints_() {
     ESP_LOGCONFIG(TAG, "* GPIO Configuration: status: pin %d, reset: pin %d", this->status_pin_reported_, this->reset_pin_reported_);
   }
 
-  if (this->status_pin_.has_value()) {
-    LOG_PIN("  Status Pin: ", this->status_pin_.value());
-  }
-
   ESP_LOGCONFIG(TAG, "* Product: '%s'", this->product_.c_str());
 }
 
-void Dxs238xwComponent::set_status_pin_() {
-  bool is_network_ready = network::is_connected() && remote_is_connected();
-
-  this->status_pin_.value()->digital_write(is_network_ready);
-}
 #endif
-
-void Dxs238xwComponent::send_wifi_status_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
-  uint8_t status = this->get_wifi_status_code_();
-
-  if (status == this->wifi_status_) {
-    return;
-  }
-
-  ESP_LOGD(TAG, "Sending WiFi Status");
-
-  this->wifi_status_ = status;
-
-  // this->push_command_(SmCommand{.cmd = CommandType::WIFI_STATE, .payload = std::vector<uint8_t>{status}}, PUSH_BACK);
-}
-
-uint8_t Dxs238xwComponent::get_wifi_status_code_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
-  uint8_t status = 0x02;
-
-  if (network::is_connected()) {
-    status = 0x03;
-
-    // Protocol version 3 also supports specifying when connected to "the cloud"
-    // if (this->protocol_version_ >= 0x03 && remote_is_connected()) {
-    //  status = 0x04;
-    //}
-  } else {
-#ifdef USE_CAPTIVE_PORTAL
-    if (captive_portal::global_captive_portal != nullptr && captive_portal::global_captive_portal->is_active()) {
-      status = 0x01;
-    }
-#endif
-  }
-
-  return status;
-}
-
-uint8_t Dxs238xwComponent::get_wifi_rssi_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
-#ifdef USE_WIFI
-  if (wifi::global_wifi_component != nullptr) {
-    return wifi::global_wifi_component->wifi_rssi();
-  }
-#endif
-
-  return 0;
-}
 
 #ifdef USE_TIME
 void Dxs238xwComponent::send_local_time_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -1408,7 +1373,7 @@ void Dxs238xwComponent::send_local_time_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 
-void Dxs238xwComponent::process_command_queue_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
+void Dxs238xwComponent::process_command_queue_() {
   uint32_t now = millis();
 
   // Limpiamos el buffer de rx si ya paso mucho tiempo y no llego un mensaje valido
@@ -1500,8 +1465,11 @@ void Dxs238xwComponent::send_raw_command_(SmCommand command) {
     case CommandType::PRODUCT_QUERY:
       this->expected_response_ = CommandType::PRODUCT_QUERY;
       break;
-    case CommandType::CONF_QUERY:
-      this->expected_response_ = CommandType::CONF_QUERY;
+    case CommandType::WORKING_MODE_QUERY:
+      this->expected_response_ = CommandType::WORKING_MODE_QUERY;
+      break;
+    case CommandType::WIFI_STATE:
+      this->expected_response_ = CommandType::WIFI_STATE;
       break;
     case CommandType::DATAPOINT_DELIVER:
     case CommandType::DATAPOINT_QUERY:

@@ -2,19 +2,10 @@
 
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/application.h"
-#include "esphome/components/network/util.h"
 #include "esphome/core/util.h"
 
 #ifdef USE_TIME
 #include "esphome/components/time/real_time_clock.h"
-#endif
-
-#ifdef USE_WIFI
-#include "esphome/components/wifi/wifi_component.h"
-#endif
-
-#ifdef USE_CAPTIVE_PORTAL
-#include "esphome/components/captive_portal/captive_portal.h"
 #endif
 
 namespace esphome {
@@ -161,10 +152,10 @@ enum class SmInitState : uint8_t {
 
 #ifdef USE_PROTOCOL_TUYA
   INIT_HEARTBEAT,
-  INIT_PRODUCT,
-  INIT_CONF,
-  INIT_WIFI,
-  INIT_DATAPOINT,
+  INIT_PRODUCT_QUERY,
+  INIT_WORKING_MODE_QUERY,
+  INIT_WIFI_STATE,
+  INIT_DATAPOINT_QUERY,
 #endif
 
   INIT_ERROR,
@@ -315,16 +306,14 @@ enum class CommandType : uint8_t {
 enum class CommandType : uint8_t {
   HEARTBEAT = 0x00,
   PRODUCT_QUERY = 0x01,
-  CONF_QUERY = 0x02,
+  WORKING_MODE_QUERY = 0x02,
   WIFI_STATE = 0x03,
-  WIFI_RESET = 0x04,
-  WIFI_SELECT = 0x05,
   DATAPOINT_DELIVER = 0x06,
-  DATAPOINT_REPORT = 0x07,
   DATAPOINT_QUERY = 0x08,
+  DATAPOINT_REPORT = 0x07,
   WIFI_TEST = 0x0E,
-  LOCAL_TIME_QUERY = 0x1C,
   WIFI_RSSI = 0x24,
+  LOCAL_TIME_QUERY = 0x1C,
   GET_NETWORK_STATUS = 0x2B,
 };
 
@@ -630,10 +619,10 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
  protected:
   SmInitState init_state_ = SmInitState::INIT_PRE_SETUP;
 
+  std::string log_command_queue_str_ = "log_command_queue";
+
   uint32_t last_command_timestamp_ = 0;
   uint32_t last_rx_char_timestamp_ = 0;
-
-  uint8_t wifi_status_ = -1;
 
   uint8_t init_retries_ = 0;
 
@@ -647,14 +636,14 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
+  std::string heartbeat_interval_str_ = "heartbeat_interval";
+
   std::string product_ = "";
 
   int8_t status_pin_reported_ = -1;
   int8_t reset_pin_reported_ = -1;
 
-  int8_t protocol_version_ = -1;
-
-  optional<InternalGPIOPin *> status_pin_{};
+  uint8_t protocol_version_ = 0x00;
 
   optional<CommandType> expected_response_{};
 
@@ -706,12 +695,7 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void send_datapoint_command_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, std::vector<uint8_t> data);
   optional<TuyaDatapoint> get_datapoint_(DatapointId datapoint_id);
   void show_info_datapoints_();
-  void set_status_pin_();
 #endif
-
-  void send_wifi_status_();
-  uint8_t get_wifi_status_code_();
-  uint8_t get_wifi_rssi_();
 
 #ifdef USE_TIME
   void send_local_time_();
