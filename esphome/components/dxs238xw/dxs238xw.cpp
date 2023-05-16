@@ -20,16 +20,9 @@ static const char *const TAG = "dxs238xw";
     } \
   }
 
-#define UPDATE_SENSOR_CASE(name_case, name, value) \
-  case DatapointId::name_case: { \
-    UPDATE_SENSOR(name, value) \
-    break; \
-  }
-
 #else
 #define UPDATE_SENSOR(name, value)
 #define UPDATE_SENSOR_FORCE(name, value)
-#define UPDATE_SENSOR_CASE(name, value)
 #endif
 
 #ifdef USE_SENSOR
@@ -211,7 +204,7 @@ void Dxs238xwComponent::setup() {
     case SmInitState::INIT_GET_LIMIT_AND_PURCHASE:
       if (!this->is_expected_message()) {
         ESP_LOGI(TAG, "* Try to load GET_LIMIT_AND_PURCHASE");
-        this->send_command_(SmCommandType::GET_LIMIT_AND_PURCHASE);
+        this->send_command_(SmCommandType::GET_LIMIT_AND_ENERGY_PURCHASE);
       }
 
       break;
@@ -269,7 +262,7 @@ void Dxs238xwComponent::setup() {
       this->set_interval("get_data", SM_MIN_INTERVAL_TO_GET_DATA, [this] {
         if (this->get_component_state() == COMPONENT_STATE_LOOP) {
           this->send_command_(SmCommandType::GET_METER_STATE);
-          this->send_command_(SmCommandType::GET_LIMIT_AND_PURCHASE);
+          this->send_command_(SmCommandType::GET_LIMIT_AND_ENERGY_PURCHASE);
         }
       });
 #endif
@@ -771,7 +764,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
     case ResponseType::RECEIVE_MEASUREMENT: {
       ESP_LOGV(TAG, "* process_and_update MEASUREMENT");
 
-      UPDATE_SENSOR_MEASUREMENTS_CURRENT(current, ((buffer[1] << 16) | (buffer[2] << 8) | buffer[3]) * 0.001)
+      UPDATE_SENSOR_MEASUREMENTS_CURRENT(current, encode_uint24(buffer[1], buffer[2], buffer[3]) * 0.001)
       UPDATE_SENSOR_MEASUREMENTS_CURRENT(current_phase_1, ((buffer[1] << 16) | (buffer[2] << 8) | buffer[3]) * 0.001)
       UPDATE_SENSOR_MEASUREMENTS_CURRENT(current_phase_2, ((buffer[4] << 16) | (buffer[5] << 8) | buffer[6]) * 0.001)
       UPDATE_SENSOR_MEASUREMENTS_CURRENT(current_phase_3, ((buffer[7] << 16) | (buffer[8] << 8) | buffer[9]) * 0.001)
@@ -816,7 +809,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
 
       break;
     }
-    case ResponseType::RECEIVE_LIMIT_AND_PURCHASE: {
+    case ResponseType::RECEIVE_LIMIT_AND_ENERGY_PURCHASE: {
       ESP_LOGV(TAG, "* process_and_update LIMIT_AND_PURCHASE");
 
       this->data_.max_voltage_limit = (buffer[1] << 8) | buffer[2];
@@ -908,6 +901,8 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       this->print_error_();
     }
   }
+
+  ESP_LOGI(TAG, "Process Command (0x%02X)", command);
 
   switch (command_type) {
     case CommandType::HEARTBEAT: {
@@ -1029,7 +1024,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
     TuyaDatapoint datapoint{};
     datapoint.id = (DatapointId) buffer[0];
     datapoint.type = (TuyaDatapointType) buffer[1];
-    datapoint.value_uint = 0;
+    datapoint.value_uint32 = 0;
 
     size_t data_size = (buffer[2] << 8) + buffer[3];
     const uint8_t *data = buffer + 4;
@@ -1048,9 +1043,9 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
         ESP_LOGD(TAG, "Datapoint %u update to %s", datapoint.id, format_hex_pretty(datapoint.value_raw).c_str());
 
         break;
-      case TuyaDatapointType::BOOLEAN:
+      case TuyaDatapointType::BOOL:
         if (data_size != 1) {
-          ESP_LOGW(TAG, "Datapoint %u has bad boolean len %zu", datapoint.id, data_size);
+          ESP_LOGW(TAG, "Datapoint %u has bad bool len %zu", datapoint.id, data_size);
           return;
         }
 
@@ -1058,15 +1053,25 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
         ESP_LOGD(TAG, "Datapoint %u update to %s", datapoint.id, ONOFF(datapoint.value_bool));
 
         break;
-      case TuyaDatapointType::INTEGER:
+      case TuyaDatapointType::UINT8:
+        if (data_size != 1) {
+          ESP_LOGW(TAG, "Datapoint %u has bad uint8 len %zu", datapoint.id, data_size);
+          return;
+        }
+        datapoint.value_uint8 = data[0];
+
+        ESP_LOGD(TAG, "Datapoint %u update to %d", datapoint.id, datapoint.value_uint8);
+
+        break;
+      case TuyaDatapointType::UINT32:
         if (data_size != 4) {
-          ESP_LOGW(TAG, "Datapoint %u has bad integer len %zu", datapoint.id, data_size);
+          ESP_LOGW(TAG, "Datapoint %u has bad uint32 len %zu", datapoint.id, data_size);
           return;
         }
 
-        datapoint.value_uint = encode_uint32(data[0], data[1], data[2], data[3]);
+        datapoint.value_uint32 = encode_uint32(data[0], data[1], data[2], data[3]);
 
-        ESP_LOGD(TAG, "Datapoint %u update to %d", datapoint.id, datapoint.value_int);
+        ESP_LOGD(TAG, "Datapoint %u update to %d", datapoint.id, datapoint.value_uint32);
 
         break;
       case TuyaDatapointType::STRING:
@@ -1074,33 +1079,23 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
         ESP_LOGD(TAG, "Datapoint %u update to %s", datapoint.id, datapoint.value_string.c_str());
 
         break;
-      case TuyaDatapointType::ENUM:
-        if (data_size != 1) {
-          ESP_LOGW(TAG, "Datapoint %u has bad enum len %zu", datapoint.id, data_size);
-          return;
-        }
-        datapoint.value_enum = data[0];
-
-        ESP_LOGD(TAG, "Datapoint %u update to %d", datapoint.id, datapoint.value_enum);
-
-        break;
-      case TuyaDatapointType::BITMASK:
+      case TuyaDatapointType::BITMAP:
         switch (data_size) {
           case 1:
-            datapoint.value_bitmask = encode_uint32(0, 0, 0, data[0]);
+            datapoint.value_bitmap = encode_uint32(0, 0, 0, data[0]);
             break;
           case 2:
-            datapoint.value_bitmask = encode_uint32(0, 0, data[0], data[1]);
+            datapoint.value_bitmap = encode_uint32(0, 0, data[0], data[1]);
             break;
           case 4:
-            datapoint.value_bitmask = encode_uint32(data[0], data[1], data[2], data[3]);
+            datapoint.value_bitmap = encode_uint32(data[0], data[1], data[2], data[3]);
             break;
           default:
             ESP_LOGW(TAG, "Datapoint %u has bad bitmask len %zu", datapoint.id, data_size);
             return;
         }
 
-        ESP_LOGD(TAG, "Datapoint %u update to %#08X", datapoint.id, datapoint.value_bitmask);
+        ESP_LOGD(TAG, "Datapoint %u update to %#08X", datapoint.id, datapoint.value_bitmap);
 
         break;
       default:
@@ -1127,45 +1122,18 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
     }
 
     DatapointId datapoint_id = (DatapointId) datapoint.id;
+
     switch (datapoint_id) {
-      UPDATE_SENSOR_CASE(FREQUENCY, frequency, datapoint.value_uint)
+#ifdef USE_MODEL_DDS238_2
+      case DatapointId::FREQUENCY: {
+        UPDATE_SENSOR(frequency, datapoint.value_uint32 * 0.01)
 
-      UPDATE_SENSOR_CASE(CURRENT, current, datapoint.value_uint)
-      /*UPDATE_SENSOR_CASE(CURRENT_PHASE_1, current_phase_1, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(CURRENT_PHASE_2, current_phase_2, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(CURRENT_PHASE_3, current_phase_3, datapoint.value_uint)*/
-
-      UPDATE_SENSOR_CASE(VOLTAGE, voltage, datapoint.value_uint)
-      /*UPDATE_SENSOR_CASE(VOLTAGE_PHASE_1, voltage_phase_1, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(VOLTAGE_PHASE_2, voltage_phase_2, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(VOLTAGE_PHASE_3, voltage_phase_3, datapoint.value_uint)*/
-
-      UPDATE_SENSOR_CASE(REACTIVE_POWER, reactive_power, datapoint.value_uint)
-      /*UPDATE_SENSOR_CASE(REACTIVE_POWER_PHASE_1, reactive_power_phase_1, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(REACTIVE_POWER_PHASE_2, reactive_power_phase_2, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(REACTIVE_POWER_PHASE_3, reactive_power_phase_3, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(REACTIVE_POWER_TOTAL, reactive_power_total, datapoint.value_uint)*/
-
-      UPDATE_SENSOR_CASE(ACTIVE_POWER, active_power, datapoint.value_uint)
-      /*UPDATE_SENSOR_CASE(ACTIVE_POWER_PHASE_1, active_power_phase_1, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(ACTIVE_POWER_PHASE_2, active_power_phase_2, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(ACTIVE_POWER_PHASE_3, active_power_phase_3, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(ACTIVE_POWER_TOTAL, active_power_total, datapoint.value_uint)*/
-
-      UPDATE_SENSOR_CASE(POWER_FACTOR, power_factor, datapoint.value_uint)
-      /*UPDATE_SENSOR_CASE(POWER_FACTOR_PHASE_1, power_factor_phase_1, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(POWER_FACTOR_PHASE_2, power_factor_phase_2, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(POWER_FACTOR_PHASE_3, power_factor_phase_3, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(POWER_FACTOR_TOTAL, power_factor_total, datapoint.value_uint)*/
-
-      UPDATE_SENSOR_CASE(IMPORT_ACTIVE_ENERGY, import_active_energy, datapoint.value_uint)
-      UPDATE_SENSOR_CASE(EXPORT_ACTIVE_ENERGY, export_active_energy, datapoint.value_uint)
-
-      // UPDATE_SENSOR_CASE(PHASE_COUNT, phase_count, datapoint.value_uint)
-
-      UPDATE_SENSOR_CASE(ENERGY_PURCHASE_BALANCE, frequency, datapoint.value_uint)
-
+        break;
+      }
+#endif
       default:
+        ESP_LOGW(TAG, "Datapoint %u has not proseced", datapoint.id);
+
         return;
     }
   }
@@ -1181,27 +1149,27 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
 
 //----------------------
 
-void Dxs238xwComponent::set_boolean_datapoint_value_(DatapointId datapoint_id, bool value, bool forced) {
+void Dxs238xwComponent::set_bool_datapoint_value_(DatapointId datapoint_id, bool value, bool priority_cmd) {
   //
-  this->numeric_datapoint_value_(datapoint_id, TuyaDatapointType::BOOLEAN, value, 1, forced);
+  this->numeric_datapoint_value_(datapoint_id, TuyaDatapointType::BOOL, value, 1, priority_cmd);
 }
 
-void Dxs238xwComponent::set_integer_datapoint_value_(DatapointId datapoint_id, uint32_t value, bool forced) {
+void Dxs238xwComponent::set_uint8_datapoint_value_(DatapointId datapoint_id, uint8_t value, bool priority_cmd) {
   //
-  this->numeric_datapoint_value_(datapoint_id, TuyaDatapointType::INTEGER, value, 4, forced);
+  this->numeric_datapoint_value_(datapoint_id, TuyaDatapointType::UINT8, value, 1, priority_cmd);
 }
 
-void Dxs238xwComponent::set_enum_datapoint_value_(DatapointId datapoint_id, uint8_t value, bool forced) {
+void Dxs238xwComponent::set_uint32_datapoint_value_(DatapointId datapoint_id, uint32_t value, bool priority_cmd) {
   //
-  this->numeric_datapoint_value_(datapoint_id, TuyaDatapointType::ENUM, value, 1, forced);
+  this->numeric_datapoint_value_(datapoint_id, TuyaDatapointType::UINT32, value, 4, priority_cmd);
 }
 
-void Dxs238xwComponent::set_bitmask_datapoint_value_(DatapointId datapoint_id, uint32_t value, uint8_t length, bool forced) {
+void Dxs238xwComponent::set_bitmap_datapoint_value_(DatapointId datapoint_id, uint32_t value, uint8_t length, bool priority_cmd) {
   //
-  this->numeric_datapoint_value_(datapoint_id, TuyaDatapointType::BITMASK, value, length, forced);
+  this->numeric_datapoint_value_(datapoint_id, TuyaDatapointType::BITMAP, value, length, priority_cmd);
 }
 
-void Dxs238xwComponent::set_raw_datapoint_value_(DatapointId datapoint_id, const std::vector<uint8_t> &value, bool forced) {
+void Dxs238xwComponent::set_raw_datapoint_value_(DatapointId datapoint_id, const std::vector<uint8_t> &value, bool priority_cmd) {
   ESP_LOGD(TAG, "Setting datapoint %u to %s", datapoint_id, format_hex_pretty(value).c_str());
 
   optional<TuyaDatapoint> datapoint = this->get_datapoint_(datapoint_id);
@@ -1211,15 +1179,15 @@ void Dxs238xwComponent::set_raw_datapoint_value_(DatapointId datapoint_id, const
   } else if (datapoint->type != TuyaDatapointType::RAW) {
     ESP_LOGE(TAG, "Attempt to set datapoint %u with incorrect type", datapoint_id);
     return;
-  } else if (!forced && datapoint->value_raw == value) {
+  } else if (datapoint->value_raw == value) {
     ESP_LOGV(TAG, "Not sending unchanged value");
     return;
   }
 
-  this->send_datapoint_command_(datapoint_id, TuyaDatapointType::RAW, value);
+  this->send_datapoint_command_(datapoint_id, TuyaDatapointType::RAW, value, priority_cmd);
 }
 
-void Dxs238xwComponent::set_string_datapoint_value_(DatapointId datapoint_id, const std::string &value, bool forced) {
+void Dxs238xwComponent::set_string_datapoint_value_(DatapointId datapoint_id, const std::string &value, bool priority_cmd) {
   ESP_LOGD(TAG, "Setting datapoint %u to %s", datapoint_id, value.c_str());
 
   optional<TuyaDatapoint> datapoint = this->get_datapoint_(datapoint_id);
@@ -1229,7 +1197,7 @@ void Dxs238xwComponent::set_string_datapoint_value_(DatapointId datapoint_id, co
   } else if (datapoint->type != TuyaDatapointType::STRING) {
     ESP_LOGE(TAG, "Attempt to set datapoint %u with incorrect type", datapoint_id);
     return;
-  } else if (!forced && datapoint->value_string == value) {
+  } else if (datapoint->value_string == value) {
     ESP_LOGV(TAG, "Not sending unchanged value");
     return;
   }
@@ -1240,12 +1208,12 @@ void Dxs238xwComponent::set_string_datapoint_value_(DatapointId datapoint_id, co
     data.push_back(c);
   }
 
-  this->send_datapoint_command_(datapoint_id, TuyaDatapointType::STRING, data);
+  this->send_datapoint_command_(datapoint_id, TuyaDatapointType::STRING, data, priority_cmd);
 }
 
 //----------------------
 
-void Dxs238xwComponent::numeric_datapoint_value_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, const uint32_t value, uint8_t length, bool forced) {
+void Dxs238xwComponent::numeric_datapoint_value_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, const uint32_t value, uint8_t length, bool priority_cmd) {
   ESP_LOGD(TAG, "Setting datapoint %u to %u", datapoint_id, value);
 
   optional<TuyaDatapoint> datapoint = this->get_datapoint_(datapoint_id);
@@ -1256,7 +1224,7 @@ void Dxs238xwComponent::numeric_datapoint_value_(DatapointId datapoint_id, TuyaD
     ESP_LOGE(TAG, "Attempt to set datapoint %u with incorrect type", datapoint_id);
 
     return;
-  } else if (!forced && datapoint->value_uint == value) {
+  } else if (datapoint->value_uint32 == value) {
     ESP_LOGV(TAG, "Not sending unchanged value");
     return;
   }
@@ -1278,10 +1246,10 @@ void Dxs238xwComponent::numeric_datapoint_value_(DatapointId datapoint_id, TuyaD
       return;
   }
 
-  this->send_datapoint_command_(datapoint_id, datapoint_type, data);
+  this->send_datapoint_command_(datapoint_id, datapoint_type, data, priority_cmd);
 }
 
-void Dxs238xwComponent::send_datapoint_command_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, std::vector<uint8_t> data) {
+void Dxs238xwComponent::send_datapoint_command_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, std::vector<uint8_t> data, bool priority_cmd) {
   std::vector<uint8_t> buffer;
 
   buffer.push_back((uint8_t) datapoint_id);
@@ -1291,7 +1259,7 @@ void Dxs238xwComponent::send_datapoint_command_(DatapointId datapoint_id, TuyaDa
 
   buffer.insert(buffer.end(), data.begin(), data.end());
 
-  this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_DELIVER, .payload = buffer});
+  this->push_command_(SmCommand{.cmd = CommandType::DATAPOINT_DELIVER, .payload = buffer, .priority_cmd = priority_cmd});
 }
 
 optional<TuyaDatapoint> Dxs238xwComponent::get_datapoint_(DatapointId datapoint_id) {
@@ -1309,16 +1277,16 @@ void Dxs238xwComponent::show_info_datapoints_() {
   for (auto &info : this->datapoints_) {
     if (info.type == TuyaDatapointType::RAW) {
       ESP_LOGCONFIG(TAG, "* Datapoint %u: raw (value: %s)", info.id, format_hex_pretty(info.value_raw).c_str());
-    } else if (info.type == TuyaDatapointType::BOOLEAN) {
-      ESP_LOGCONFIG(TAG, "* Datapoint %u: switch (value: %s)", info.id, ONOFF(info.value_bool));
-    } else if (info.type == TuyaDatapointType::INTEGER) {
-      ESP_LOGCONFIG(TAG, "* Datapoint %u: int value (value: %d)", info.id, info.value_int);
+    } else if (info.type == TuyaDatapointType::BOOL) {
+      ESP_LOGCONFIG(TAG, "* Datapoint %u: bool (value: %s)", info.id, TRUEFALSE(info.value_bool));
+    } else if (info.type == TuyaDatapointType::UINT8) {
+      ESP_LOGCONFIG(TAG, "* Datapoint %u: uint8 (value: %d)", info.id, info.value_uint8);
+    } else if (info.type == TuyaDatapointType::UINT32) {
+      ESP_LOGCONFIG(TAG, "* Datapoint %u: uint32 value (value: %d)", info.id, info.value_uint32);
     } else if (info.type == TuyaDatapointType::STRING) {
       ESP_LOGCONFIG(TAG, "* Datapoint %u: string value (value: %s)", info.id, info.value_string.c_str());
-    } else if (info.type == TuyaDatapointType::ENUM) {
-      ESP_LOGCONFIG(TAG, "* Datapoint %u: enum (value: %d)", info.id, info.value_enum);
-    } else if (info.type == TuyaDatapointType::BITMASK) {
-      ESP_LOGCONFIG(TAG, "* Datapoint %u: bitmask (value: %x)", info.id, info.value_bitmask);
+    } else if (info.type == TuyaDatapointType::BITMAP) {
+      ESP_LOGCONFIG(TAG, "* Datapoint %u: bitmap (value: %x)", info.id, info.value_bitmap);
     } else {
       ESP_LOGCONFIG(TAG, "* Datapoint %u: unknown", info.id);
     }
@@ -1655,7 +1623,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
-      this->set_boolean_datapoint_value_(DatapointId::TOTAL_ENERGY, false);
+      this->set_bool_datapoint_value_(DatapointId::TOTAL_ENERGY, false);
 #endif
 
       break;
@@ -1668,11 +1636,11 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
 #endif
       break;
     }
-    case SmCommandType::GET_LIMIT_AND_PURCHASE: {
+    case SmCommandType::GET_LIMIT_AND_ENERGY_PURCHASE: {
       ESP_LOGV(TAG, "Push Command - GET_LIMIT_AND_PURCHASE");
 
 #ifdef USE_PROTOCOL_HEKR
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_LIMIT_AND_PURCHASE}});
+      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_LIMIT_AND_ENERGY_PURCHASE}});
 #endif
       break;
     }
@@ -1701,7 +1669,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
 
       break;
     }
-    case SmCommandType::SET_PURCHASE: {
+    case SmCommandType::SET_ENERGY_PURCHASE: {
       ESP_LOGD(TAG, "Push Command - SET_PURCHASE");
 
       uint32_t purchase_value = 0;
@@ -1715,7 +1683,7 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
 #ifdef USE_PROTOCOL_HEKR
       std::vector<uint8_t> buffer;
 
-      buffer.push_back((uint8_t) CommandData::SET_PURCHASE);
+      buffer.push_back((uint8_t) CommandData::SET_ENERGY_PURCHASE);
 
       buffer.push_back(purchase_value >> 24);
       buffer.push_back(purchase_value >> 16);
@@ -1940,7 +1908,7 @@ void Dxs238xwComponent::process_switch_state(SmIdEntity entity, bool state) {
   if (this->get_component_state() == COMPONENT_STATE_LOOP) {
     switch (entity) {
       case SmIdEntity::SWITCH_ENERGY_PURCHASE_STATE: {
-        this->send_command_(SmCommandType::SET_PURCHASE, state);
+        this->send_command_(SmCommandType::SET_ENERGY_PURCHASE, state);
 
         UPDATE_SWITCH_FORCE(energy_purchase_state, state)
         break;
@@ -1971,7 +1939,7 @@ void Dxs238xwComponent::process_button_action(SmIdEntity entity) {
   if (this->get_component_state() == COMPONENT_STATE_LOOP) {
     switch (entity) {
       case SmIdEntity::BUTTON_RESET_DATA: {
-        this->send_command_(SmCommandType::SET_PURCHASE, false);
+        this->send_command_(SmCommandType::SET_ENERGY_PURCHASE, false);
         this->send_command_(SmCommandType::SET_RESET);
 
         break;

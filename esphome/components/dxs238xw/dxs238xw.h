@@ -55,7 +55,7 @@ static const char *const SM_STR_METER_MODEL = "DTS238_7";
 #ifdef USE_API
 static const uint16_t SM_POSTPONE_SETUP_TIME = 10000;
 #else
-static const uint16_t SM_POSTPONE_SETUP_TIME = 2500;
+static const uint16_t SM_POSTPONE_SETUP_TIME = 3500;
 #endif
 
 #ifdef USE_PROTOCOL_HEKR
@@ -242,11 +242,11 @@ enum SmLimitValue : uint32_t {
 enum class SmCommandType : uint8_t {
   GET_METER_STATE,
   GET_MEASUREMENT,
-  GET_LIMIT_AND_PURCHASE,
+  GET_LIMIT_AND_ENERGY_PURCHASE,
   GET_METER_ID,
 
   SET_LIMIT,
-  SET_PURCHASE,
+  SET_ENERGY_PURCHASE,
   SET_METER_STATE,
   SET_DELAY,
   SET_RESET,
@@ -277,18 +277,18 @@ enum class ErrorValue : uint8_t {
 enum class ResponseType : uint8_t {
   RECEIVE_METER_STATE = 0x01,
   RECEIVE_MEASUREMENT = 0x0B,
-  RECEIVE_LIMIT_AND_PURCHASE = 0x08,
+  RECEIVE_LIMIT_AND_ENERGY_PURCHASE = 0x08,
   RECEIVE_METER_ID = 0x07,
 };
 
 enum class CommandData : uint8_t {
   GET_METER_STATE = 0x00,
   GET_MEASUREMENT = 0x0A,
-  GET_LIMIT_AND_PURCHASE = 0x02,
+  GET_LIMIT_AND_ENERGY_PURCHASE = 0x02,
   GET_METER_ID = 0x06,
 
   SET_LIMIT = 0x03,
-  SET_PURCHASE = 0x0D,
+  SET_ENERGY_PURCHASE = 0x0D,
   SET_METER_STATE = 0x09,
   SET_DELAY = 0x0C,
   SET_RESET = 0x05,
@@ -317,6 +317,31 @@ enum class CommandType : uint8_t {
   GET_NETWORK_STATUS = 0x2B,
 };
 
+enum class TuyaDatapointType : uint8_t {
+  RAW = 0x00,     // variable length
+  BOOL = 0x01,    // 1 byte (0/1)
+  UINT32 = 0x02,  // 4 byte
+  STRING = 0x03,  // variable length
+  UINT8 = 0x04,   // 1 byte
+  BITMAP = 0x05,  // 1/2/4 bytes
+};
+
+struct TuyaDatapoint {
+  DatapointId id;
+  TuyaDatapointType type;
+  size_t len;
+
+  union {
+    bool value_bool;
+    uint8_t value_uint8;
+    uint32_t value_uint32;
+    uint32_t value_bitmap;
+  };
+
+  std::string value_string;
+  std::vector<uint8_t> value_raw;
+};
+
 #ifdef USE_MODEL_DDS238_2
 enum class DatapointId : uint8_t {
   FREQUENCY = 105,
@@ -329,24 +354,18 @@ enum class DatapointId : uint8_t {
 
   IMPORT_ACTIVE_ENERGY = 101,
   EXPORT_ACTIVE_ENERGY = 9,
-  TOTAL_ENERGY = 204,
+  TOTAL_ENERGY = 200,
 
-  MAX_CURRENT_LIMIT = 206,
-  MAX_VOLTAGE_LIMIT = 207,
-  MIN_VOLTAGE_LIMIT = 208,
+  ENERGY_PURCHASE_ALARM = 201,
+  ENERGY_PURCHASE_BALANCE = 202,
 
-  ENERGY_PURCHASE_VALUE = 209,
-  ENERGY_PURCHASE_ALARM = 210,
-  ENERGY_PURCHASE_BALANCE = 203,
+  DELAY_VALUE_REMAINING = 203,
 
-  DELAY_VALUE_REMAINING = 205,
-  DELAY_VALUE_SET = 211,
-
-  ENERGY_PURCHASE_STATE = 212,
-  METER_STATE = 1,
-  DELAY_STATE = 213,
-
-  RESET_DATA = 214,
+  SET_LIMIT = 204,
+  SET_ENERGY_PURCHASE = 205,
+  SET_METER_STATE = 206,
+  SET_DELAY = 207,
+  SET_RESET_DATA = 208,
 };
 #endif
 
@@ -394,32 +413,6 @@ enum class DatapointId : uint8_t {
   RESET_DATA = 139,
 };
 #endif
-
-enum class TuyaDatapointType : uint8_t {
-  RAW = 0x00,      // variable length
-  BOOLEAN = 0x01,  // 1 byte (0/1)
-  INTEGER = 0x02,  // 4 byte
-  STRING = 0x03,   // variable length
-  ENUM = 0x04,     // 1 byte
-  BITMASK = 0x05,  // 1/2/4 bytes
-};
-
-struct TuyaDatapoint {
-  DatapointId id;
-  TuyaDatapointType type;
-  size_t len;
-
-  union {
-    bool value_bool;
-    int value_int;
-    uint32_t value_uint;
-    uint8_t value_enum;
-    uint32_t value_bitmask;
-  };
-
-  std::string value_string;
-  std::vector<uint8_t> value_raw;
-};
 #endif
 
 struct SmCommand {
@@ -684,15 +677,15 @@ class Dxs238xwComponent : public PollingComponent, public uart::UARTDevice {
   void handle_command_(uint8_t command, uint8_t version, const uint8_t *buffer, size_t len);
   void process_and_update_data_(const uint8_t *buffer, size_t len);
 
-  void set_boolean_datapoint_value_(DatapointId datapoint_id, bool value, bool forced = false);
-  void set_integer_datapoint_value_(DatapointId datapoint_id, uint32_t value, bool forced = false);
-  void set_enum_datapoint_value_(DatapointId datapoint_id, uint8_t value, bool forced = false);
-  void set_bitmask_datapoint_value_(DatapointId datapoint_id, uint32_t value, uint8_t length, bool forced = false);
-  void set_raw_datapoint_value_(DatapointId datapoint_id, const std::vector<uint8_t> &value, bool forced = false);
-  void set_string_datapoint_value_(DatapointId datapoint_id, const std::string &value, bool forced = false);
+  void set_bool_datapoint_value_(DatapointId datapoint_id, bool value, bool priority_cmd = false);
+  void set_uint8_datapoint_value_(DatapointId datapoint_id, uint8_t value, bool priority_cmd = false);
+  void set_uint32_datapoint_value_(DatapointId datapoint_id, uint32_t value, bool priority_cmd = false);
+  void set_bitmap_datapoint_value_(DatapointId datapoint_id, uint32_t value, uint8_t length, bool priority_cmd = false);
+  void set_raw_datapoint_value_(DatapointId datapoint_id, const std::vector<uint8_t> &value, bool priority_cmd = false);
+  void set_string_datapoint_value_(DatapointId datapoint_id, const std::string &value, bool priority_cmd = false);
 
-  void numeric_datapoint_value_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, uint32_t value, uint8_t length, bool forced);
-  void send_datapoint_command_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, std::vector<uint8_t> data);
+  void numeric_datapoint_value_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, uint32_t value, uint8_t length, bool priority_cmd);
+  void send_datapoint_command_(DatapointId datapoint_id, TuyaDatapointType datapoint_type, std::vector<uint8_t> data, bool priority_cmd);
   optional<TuyaDatapoint> get_datapoint_(DatapointId datapoint_id);
   void show_info_datapoints_();
 #endif
