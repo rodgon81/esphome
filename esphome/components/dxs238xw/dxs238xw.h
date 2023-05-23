@@ -11,12 +11,19 @@
 namespace esphome {
 namespace dxs238xw {
 
+//------------------------------------------------------------------------------
+// THIS DEFINE IS ONLY FOR DEVELOPMENT
+//------------------------------------------------------------------------------
+
 // #define USE_PROTOCOL_HEKR
 // #define USE_PROTOCOL_TUYA
 
 // #define USE_MODEL_DDS238_2
 // #define USE_MODEL_DDS238_4
 // #define USE_MODEL_DTS238_7
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 //*************************************************************************************
 
@@ -240,11 +247,6 @@ enum SmLimitValue : uint32_t {
 };
 
 enum class SmCommandType : uint8_t {
-  GET_METER_STATE,
-  GET_MEASUREMENT,
-  GET_LIMIT_AND_ENERGY_PURCHASE,
-  GET_METER_ID,
-
   SET_LIMIT,
   SET_ENERGY_PURCHASE,
   SET_METER_STATE,
@@ -344,28 +346,30 @@ struct TuyaDatapoint {
 
 #ifdef USE_MODEL_DDS238_2
 enum class DatapointId : uint8_t {
-  FREQUENCY = 105,
+  //  FREQUENCY = 0,
   CURRENT = 18,
   VOLTAGE = 20,
-  POWER_FACTOR = 111,
+  //  POWER_FACTOR = 0,
 
-  REACTIVE_POWER = 110,
+  REACTIVE_POWER = 51,  /////????
   ACTIVE_POWER = 19,
 
   IMPORT_ACTIVE_ENERGY = 101,
   EXPORT_ACTIVE_ENERGY = 9,
-  TOTAL_ENERGY = 200,
+  //  TOTAL_ENERGY = 0,
 
-  ENERGY_PURCHASE_ALARM = 201,
-  ENERGY_PURCHASE_BALANCE = 202,
+  // ENERGY_PURCHASE_ALARM = 0,
+  //  ENERGY_PURCHASE_BALANCE = 0,
 
-  DELAY_VALUE_REMAINING = 203,
+  //  DELAY_VALUE_REMAINING = 0,
 
-  SET_LIMIT = 204,
-  SET_ENERGY_PURCHASE = 205,
-  SET_METER_STATE = 206,
-  SET_DELAY = 207,
-  SET_RESET_DATA = 208,
+  //  SET_LIMIT = 0,
+  //  SET_ENERGY_PURCHASE = 0,
+  METER_STATE = 1,
+  //  SET_DELAY = 0,
+  //  SET_RESET_DATA = 0,
+  GET_CONFIG = 17,
+  GET_DATA = 6,
 };
 #endif
 
@@ -373,31 +377,51 @@ enum class DatapointId : uint8_t {
 enum class DatapointId : uint8_t {
   FREQUENCY = 100,
   CURRENT = 101,
+  VOLTAGE = 105,
+  REACTIVE_POWER = 109,
+  ACTIVE_POWER = 114,
+  POWER_FACTOR = 119,
+  IMPORT_ACTIVE_ENERGY = 124,
+  EXPORT_ACTIVE_ENERGY = 125,
+  ENERGY_PURCHASE_BALANCE = 127,
+  TOTAL_ENERGY = 128,
+  DELAY_VALUE_REMAINING = 129,
+  MAX_CURRENT_LIMIT = 130,
+  MAX_VOLTAGE_LIMIT = 131,
+  MIN_VOLTAGE_LIMIT = 132,
+  ENERGY_PURCHASE_VALUE = 133,
+  ENERGY_PURCHASE_ALARM = 134,
+  DELAY_VALUE_SET = 135,
+  ENERGY_PURCHASE_STATE = 136,
+  METER_STATE = 137,
+  DELAY_STATE = 138,
+  RESET_DATA = 139,
+};
+#endif
+
+#ifdef USE_MODEL_DTS238_7
+enum class DatapointId : uint8_t {
+  FREQUENCY = 100,
   CURRENT_PHASE_1 = 102,
   CURRENT_PHASE_2 = 103,
   CURRENT_PHASE_3 = 104,
-  VOLTAGE = 105,
   VOLTAGE_PHASE_1 = 106,
   VOLTAGE_PHASE_2 = 107,
   VOLTAGE_PHASE_3 = 108,
-  REACTIVE_POWER = 109,
   REACTIVE_POWER_PHASE_1 = 110,
   REACTIVE_POWER_PHASE_2 = 111,
   REACTIVE_POWER_PHASE_3 = 112,
   REACTIVE_POWER_TOTAL = 113,
-  ACTIVE_POWER = 114,
   ACTIVE_POWER_PHASE_1 = 115,
   ACTIVE_POWER_PHASE_2 = 116,
   ACTIVE_POWER_PHASE_3 = 117,
   ACTIVE_POWER_TOTAL = 118,
-  POWER_FACTOR = 119,
   POWER_FACTOR_PHASE_1 = 120,
   POWER_FACTOR_PHASE_2 = 121,
   POWER_FACTOR_PHASE_3 = 122,
   POWER_FACTOR_TOTAL = 123,
   IMPORT_ACTIVE_ENERGY = 124,
   EXPORT_ACTIVE_ENERGY = 125,
-  PHASE_COUNT = 126,
   ENERGY_PURCHASE_BALANCE = 127,
   TOTAL_ENERGY = 128,
   DELAY_VALUE_REMAINING = 129,

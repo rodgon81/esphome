@@ -182,16 +182,16 @@ def validate_protocol_and_model(config):
             )
         elif config[CONF_MODEL] == MODEL_DDS238_4:
             _LOGGER.info(
-                "Model and protocol supported"
+                "Model '%s' and protocol '%s' are supported", config[CONF_MODEL], config[CONF_PROTOCOL]
             )
         elif config[CONF_MODEL] == MODEL_DTS238_7:
             _LOGGER.info(
-                "Model and protocol supported"
+                "Model '%s' and protocol '%s' are supported", config[CONF_MODEL], config[CONF_PROTOCOL]
             )
     elif config[CONF_PROTOCOL] == PROTOCOL_TUYA:
         if config[CONF_MODEL] == MODEL_DDS238_2:
             _LOGGER.info(
-                "Model and protocol supported"
+                "Model '%s' and protocol '%s' are supported", config[CONF_MODEL], config[CONF_PROTOCOL]
             )
         elif config[CONF_MODEL] == MODEL_DDS238_4:
             raise cv.Invalid(

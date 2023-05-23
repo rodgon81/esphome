@@ -183,28 +183,28 @@ void Dxs238xwComponent::setup() {
     case SmInitState::INIT_GET_METER_ID:
       if (!this->is_expected_message()) {
         ESP_LOGI(TAG, "* Try to load GET_METER_ID");
-        this->send_command_(SmCommandType::GET_METER_ID);
+        this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_METER_ID}});
       }
 
       break;
     case SmInitState::INIT_GET_METER_STATE:
       if (!this->is_expected_message()) {
         ESP_LOGI(TAG, "* Try to load GET_METER_STATE");
-        this->send_command_(SmCommandType::GET_METER_STATE);
+        this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_METER_STATE}});
       }
 
       break;
     case SmInitState::INIT_GET_MEASUREMENT:
       if (!this->is_expected_message()) {
         ESP_LOGI(TAG, "* Try to load GET_MEASUREMENT");
-        this->send_command_(SmCommandType::GET_MEASUREMENT);
+        this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_MEASUREMENT}});
       }
 
       break;
     case SmInitState::INIT_GET_LIMIT_AND_PURCHASE:
       if (!this->is_expected_message()) {
         ESP_LOGI(TAG, "* Try to load GET_LIMIT_AND_PURCHASE");
-        this->send_command_(SmCommandType::GET_LIMIT_AND_ENERGY_PURCHASE);
+        this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_LIMIT_AND_ENERGY_PURCHASE}});
       }
 
       break;
@@ -252,7 +252,7 @@ void Dxs238xwComponent::setup() {
 #endif
 
     case SmInitState::INIT_ERROR:
-      ESP_LOGI(TAG, "* Estas seguro de que el protocolo selecionado (%s) es correcto?", SM_STR_PROTOCOL);
+      ESP_LOGI(TAG, "* Are you sure the selected protocol (%s) is correct?", SM_STR_PROTOCOL);
 
       this->mark_failed();
 
@@ -261,8 +261,8 @@ void Dxs238xwComponent::setup() {
 #ifdef USE_PROTOCOL_HEKR
       this->set_interval("get_data", SM_MIN_INTERVAL_TO_GET_DATA, [this] {
         if (this->get_component_state() == COMPONENT_STATE_LOOP) {
-          this->send_command_(SmCommandType::GET_METER_STATE);
-          this->send_command_(SmCommandType::GET_LIMIT_AND_ENERGY_PURCHASE);
+          this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_METER_STATE}});
+          this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_LIMIT_AND_ENERGY_PURCHASE}});
         }
       });
 #endif
@@ -275,7 +275,7 @@ void Dxs238xwComponent::setup() {
 
       this->set_interval(log_command_queue_str_, 2000, [this] {
         if (this->command_queue_.size() >= 5) {
-          ESP_LOGW(TAG, "Comandos en cola anormalmente aumentados %u", this->command_queue_.size());
+          ESP_LOGW(TAG, "Queued commands increased abnormally %u", this->command_queue_.size());
         }
       });
 
@@ -299,11 +299,14 @@ void Dxs238xwComponent::loop() {
 }
 
 void Dxs238xwComponent::update() {
-#ifdef USE_PROTOCOL_HEKR
   if (this->get_component_state() == COMPONENT_STATE_LOOP) {
-    this->send_command_(SmCommandType::GET_MEASUREMENT);
-  }
+#ifdef USE_PROTOCOL_HEKR
+    this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_MEASUREMENT}});
 #endif
+#ifdef USE_PROTOCOL_TUYA
+    //
+#endif
+  }
 }
 
 void Dxs238xwComponent::dump_config() {
@@ -386,7 +389,6 @@ bool Dxs238xwComponent::validate_message_() {
     }
   }
 
-  // wait until all data is read
   if (at < (length - 1)) {
     return true;
   }
@@ -425,15 +427,12 @@ bool Dxs238xwComponent::validate_message_() {
     return true;
   }
 
-  // Byte 4: LENGTH1
-  // Byte 5: LENGTH2
   if (at <= 5) {
     return true;
   }
 
   uint16_t length = (uint16_t(data[4]) << 8) | (uint16_t(data[5]));
 
-  // wait until all data is read
   if ((at - 6) < length) {
     return true;
   }
@@ -462,12 +461,11 @@ bool Dxs238xwComponent::validate_message_() {
   this->handle_command_(command, version, message_data, length);
 #endif
 
-  // return false to reset rx buffer
   return false;
 }
 
 #ifdef USE_PROTOCOL_HEKR
-void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, size_t len) {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
+void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, size_t len) {
   CommandType command_type = (CommandType) command;
 
   if (this->expected_confirmation_.has_value()) {
@@ -516,16 +514,13 @@ void Dxs238xwComponent::handle_command_(uint8_t command, const uint8_t *buffer, 
 
       this->expected_response_.reset();
 
-      // comprobamos si no se declaro el mensaje nulo
       if (this->command_queue_.front().null_old_response) {
-        ESP_LOGI(TAG, "* Anulamos respuesta recibida, ya que llego un comando mas actualizado 0x%02X-0x%02X", command_type, buffer[0]);
+        ESP_LOGI(TAG, "* The response received was cancelled, since a more updated command arrived 0x%02X-0x%02X", command_type, buffer[0]);
 
-        // procesamos otra vez el mensaje con los datos actualizados.
         this->command_queue_.front().null_old_response = false;
 
         return;
       } else {
-        // Liberamos el mensaje retenido y lo borramos ya que si resivio respuesta
         this->command_queue_.erase(this->command_queue_.begin());
       }
 
@@ -869,16 +864,13 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
 
       this->expected_response_.reset();
 
-      // comprobamos si no se declaro el mensaje nulo
       if (this->command_queue_.front().null_old_response) {
-        ESP_LOGI(TAG, "* Anulamos respuesta recibida, ya que llego un comando mas actualizado 0x%02X-0x%02X", command_type, buffer[0]);
+        ESP_LOGI(TAG, "* The response received was cancelled, since a more updated command arrived 0x%02X-0x%02X", command_type, buffer[0]);
 
-        // procesamos otra vez el mensaje con los datos actualizados.
         this->command_queue_.front().null_old_response = false;
 
         return;
       } else {
-        // Liberamos el mensaje retenido y lo borramos ya que si resivio respuesta
         this->command_queue_.erase(this->command_queue_.begin());
       }
 
@@ -929,7 +921,6 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       break;
     }
     case CommandType::PRODUCT_QUERY: {
-      // check it is a valid string made up of printable characters
       bool valid = true;
 
       for (size_t i = 0; i < len; i++) {
@@ -1125,11 +1116,62 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
 
     switch (datapoint_id) {
 #ifdef USE_MODEL_DDS238_2
-      case DatapointId::FREQUENCY: {
-        UPDATE_SENSOR(frequency, datapoint.value_uint32 * 0.01)
+      case DatapointId::CURRENT: {
+        UPDATE_SENSOR(current, datapoint.value_uint32 * 0.001)
 
         break;
       }
+      case DatapointId::VOLTAGE: {
+        UPDATE_SENSOR(voltage, datapoint.value_uint32 * 0.1)
+
+        break;
+      }
+      case DatapointId::ACTIVE_POWER: {
+        UPDATE_SENSOR(active_power, datapoint.value_uint32 * 0.1)
+
+        break;
+      }
+      case DatapointId::IMPORT_ACTIVE_ENERGY: {
+        UPDATE_SENSOR(import_active_energy, datapoint.value_uint32 * 0.01)
+
+        break;
+      }
+      case DatapointId::EXPORT_ACTIVE_ENERGY: {
+        UPDATE_SENSOR(export_active_energy, datapoint.value_uint32 * -0.01)
+
+        break;
+      }
+      case DatapointId::METER_STATE: {
+        this->data_.meter_state = datapoint.value_bool;
+
+        if (this->data_.meter_state) {
+          this->data_.warning_off_by_over_voltage = false;
+          this->data_.warning_off_by_under_voltage = false;
+          this->data_.warning_off_by_over_current = false;
+          this->data_.warning_off_by_end_purchase = false;
+          this->data_.warning_off_by_end_delay = false;
+          this->data_.warning_off_by_user = false;
+        }
+
+        UPDATE_BINARY_SENSOR(warning_off_by_over_voltage, this->data_.warning_off_by_over_voltage)
+        UPDATE_BINARY_SENSOR(warning_off_by_under_voltage, this->data_.warning_off_by_under_voltage)
+        UPDATE_BINARY_SENSOR(warning_off_by_over_current, this->data_.warning_off_by_over_current)
+        UPDATE_BINARY_SENSOR(warning_off_by_end_purchase, this->data_.warning_off_by_end_purchase)
+        UPDATE_BINARY_SENSOR(warning_off_by_end_delay, this->data_.warning_off_by_end_delay)
+        UPDATE_BINARY_SENSOR(warning_off_by_user, this->data_.warning_off_by_user)
+
+        UPDATE_BINARY_SENSOR(meter_state, this->data_.meter_state)
+
+        UPDATE_SWITCH(meter_state, this->data_.meter_state)
+
+        this->update_meter_state_detail_();
+
+        break;
+      }
+#endif
+#ifdef USE_MODEL_DDS238_4
+#endif
+#ifdef USE_MODEL_DTS238_7
 #endif
       default:
         ESP_LOGW(TAG, "Datapoint %u has not proseced", datapoint.id);
@@ -1344,9 +1386,8 @@ void Dxs238xwComponent::send_local_time_() {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
 void Dxs238xwComponent::process_command_queue_() {
   uint32_t now = millis();
 
-  // Limpiamos el buffer de rx si ya paso mucho tiempo y no llego un mensaje valido
   if ((this->last_rx_char_timestamp_ != 0) && (now - this->last_rx_char_timestamp_) > SM_MAX_MILLIS_TO_RX_BYTE) {
-    ESP_LOGW(TAG, "* Se agoto tiempo de espera para un nuevo caracter");
+    ESP_LOGW(TAG, "* Time ran out waiting for a new char");
 
     this->rx_message_.clear();
 
@@ -1358,8 +1399,6 @@ void Dxs238xwComponent::process_command_queue_() {
     this->print_error_();
   }
 
-  // verificamos si no hemos superado el tiempo de espera para resivir una respuesta
-  // si superamos el tiempo podemos seguir procesando mensajes en cola
   if (this->is_message_timeout_()) {
     if (this->init_state_ != SmInitState::INIT_DONE) {
       if (++this->init_retries_ >= SM_MAX_RETRIES) {
@@ -1375,12 +1414,11 @@ void Dxs238xwComponent::process_command_queue_() {
       }
     } else {
       if (this->command_queue_.front().payload.empty()) {
-        ESP_LOGW(TAG, "* Se agoto el tiempo de espera para confirmacion o respuesta comand = %02X", this->command_queue_.front().cmd);
+        ESP_LOGW(TAG, "* Confirmation or Response command timed out = %02X", this->command_queue_.front().cmd);
       } else {
-        ESP_LOGW(TAG, "* Se agoto el tiempo de espera para confirmacion o respuesta comand = %02X/%02X", this->command_queue_.front().cmd, this->command_queue_.front().payload[0]);
+        ESP_LOGW(TAG, "* Confirmation or Response command timed out = %02X/%02X", this->command_queue_.front().cmd, this->command_queue_.front().payload[0]);
       }
 
-      // Borramos el mensaje retenido esperando respuesta ya que nunca resivio respuesta
       this->command_queue_.erase(this->command_queue_.begin());
 
       this->error_type_ = SmErrorType::COMMUNICATION;
@@ -1393,7 +1431,6 @@ void Dxs238xwComponent::process_command_queue_() {
   if ((now - this->last_command_timestamp_) > SM_COMMAND_DELAY && !this->command_queue_.empty() && this->rx_message_.empty() && !this->is_expected_message()) {
     this->send_raw_command_(this->command_queue_.front());
 
-    // El comando se queda retenido si es necesario esperar una respuesta, si no se elimina del listado
     if (!this->is_expected_message()) {
       this->command_queue_.erase(this->command_queue_.begin());
     }
@@ -1404,7 +1441,7 @@ void Dxs238xwComponent::send_raw_command_(SmCommand command) {
   this->error_type_ = SmErrorType::NO_ERROR;
   this->error_code_ = SmErrorCode::NO_ERROR;
 
-  ESP_LOGV(TAG, "* Procesando comando en cola");
+  ESP_LOGV(TAG, "* Queue command processing");
 
   this->last_command_timestamp_ = millis();
 
@@ -1497,11 +1534,10 @@ void Dxs238xwComponent::send_raw_command_(SmCommand command) {
 void Dxs238xwComponent::push_command_(const SmCommand &command) {
   uint8_t index = 0;
 
-  // Buscamos si es que ya existe el mensaje
   for (auto &cmd : this->command_queue_) {
     if (cmd.cmd == command.cmd) {
       if (cmd.payload.empty() && command.payload.empty()) {
-        ESP_LOGV(TAG, "* Descartamos el comando por estar repetido %02X", command.cmd);
+        ESP_LOGV(TAG, "* We discard the command because it is repeated %02X", command.cmd);
 
         return;
       } else {
@@ -1509,12 +1545,10 @@ void Dxs238xwComponent::push_command_(const SmCommand &command) {
         bool null_response = false;
 
         if (!cmd.payload.empty() && !command.payload.empty() && cmd.payload.front() == command.payload.front()) {
-          // comprobamos si reemplazamos el comando existente o descartamos el comando que llego
           if (index == 0) {
             if (this->is_expected_message()) {
-              // Si tiene payload comparamos si es distinto el dato guardado al nuevo comando
               if (cmd.payload == command.payload) {
-                ESP_LOGV(TAG, "* Descartamos el comando por estar repetido %02X-%02X", command.cmd, command.payload.front());
+                ESP_LOGV(TAG, "* We discard the command because it is repeated %02X-%02X", command.cmd, command.payload.front());
 
                 return;
               } else {
@@ -1537,11 +1571,11 @@ void Dxs238xwComponent::push_command_(const SmCommand &command) {
             if (null_response) {
               cmd.null_old_response = true;
 
-              ESP_LOGV(TAG, "* Se anula la respuesta en espera %02X-%02X", command.cmd, command.payload.front());
+              ESP_LOGV(TAG, "* Waiting response is discarded %02X-%02X", command.cmd, command.payload.front());
             }
 
           } else {
-            ESP_LOGV(TAG, "* Command exist in queue, se descarta nuevo mensaje %02X-%02X", command.cmd, command.payload.front());
+            ESP_LOGV(TAG, "* Command exist in queue, new message is discarded %02X-%02X", command.cmd, command.payload.front());
           }
 
           return;
@@ -1554,7 +1588,7 @@ void Dxs238xwComponent::push_command_(const SmCommand &command) {
 
   if (command.priority_cmd) {
     if (this->command_queue_.empty()) {
-      ESP_LOGV(TAG, "* Comando prioritario agregado a lista vacia: 1° lugar - 0x%02X-0x%02X", command.cmd, command.payload.front());
+      ESP_LOGV(TAG, "* Priority command added to empty list: 1° place - 0x%02X-0x%02X", command.cmd, command.payload.front());
 
       command_queue_.push_back(command);
     } else {
@@ -1563,7 +1597,7 @@ void Dxs238xwComponent::push_command_(const SmCommand &command) {
       for (auto &cmd_ex : this->command_queue_) {
         if (cmd_ex.priority_cmd) {
           if (index == (this->command_queue_.size() - 1)) {
-            ESP_LOGV(TAG, "* Comando prioritario agregado despues de otros prioritarios: %u° lugar - 0x%02X-0x%02X", index + 1, command.cmd, command.payload.front());
+            ESP_LOGV(TAG, "* Priority command added after other priorities: %u° place - 0x%02X-0x%02X", index + 1, command.cmd, command.payload.front());
 
             command_queue_.push_back(command);
 
@@ -1573,21 +1607,21 @@ void Dxs238xwComponent::push_command_(const SmCommand &command) {
           if (index == 0) {
             if (this->is_expected_message()) {
               if (this->command_queue_.size() == 1) {
-                ESP_LOGV(TAG, "* Comando prioritario agregado despues de mensaje en proceso: 2° lugar - 0x%02X-0x%02X", command.cmd, command.payload.front());
+                ESP_LOGV(TAG, "* Priority command added after message in process: 2° place - 0x%02X-0x%02X", command.cmd, command.payload.front());
 
                 command_queue_.push_back(command);
 
                 return;
               }
             } else {
-              ESP_LOGV(TAG, "* Comando prioritario agregado: 1° lugar - 0x%02X-0x%02X", command.cmd, command.payload.front());
+              ESP_LOGV(TAG, "* Added priority command: 1° place - 0x%02X-0x%02X", command.cmd, command.payload.front());
 
               this->command_queue_.insert(this->command_queue_.begin(), command);
 
               return;
             }
           } else {
-            ESP_LOGV(TAG, "* Comando prioritario agregado despues de otros prioritarios: %u° lugar - 0x%02X-0x%02X", index + 1, command.cmd, command.payload.front());
+            ESP_LOGV(TAG, "* Priority command added after other priorities: %u° place - 0x%02X-0x%02X", index + 1, command.cmd, command.payload.front());
 
             this->command_queue_.insert(this->command_queue_.begin() + index, command);
 
@@ -1599,57 +1633,20 @@ void Dxs238xwComponent::push_command_(const SmCommand &command) {
       }
     }
   } else {
-    ESP_LOGV(TAG, "* Comando normal agregado al final de la lista: %u° lugar - 0x%02X-0x%02X", this->command_queue_.size() + 1, command.cmd, command.payload.front());
+    ESP_LOGV(TAG, "* Normal command added to the end of the list: %u° lugar - 0x%02X-0x%02X", this->command_queue_.size() + 1, command.cmd, command.payload.front());
 
     command_queue_.push_back(command);
   }
 }
 
-void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXXXXXXXXXXXXXXXXXXXXXXXX
+void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {
   switch (cmd) {
-    case SmCommandType::GET_METER_ID: {
-      ESP_LOGV(TAG, "Push Command - GET_METER_ID");
-
-#ifdef USE_PROTOCOL_HEKR
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_METER_ID}});
-#endif
-      break;
-    }
-    case SmCommandType::GET_METER_STATE: {
-      ESP_LOGV(TAG, "Push Command - GET_METER_STATE");
-
-#ifdef USE_PROTOCOL_HEKR
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_METER_STATE}});
-#endif
-
-#ifdef USE_PROTOCOL_TUYA
-      this->set_bool_datapoint_value_(DatapointId::TOTAL_ENERGY, false);
-#endif
-
-      break;
-    }
-    case SmCommandType::GET_MEASUREMENT: {
-      ESP_LOGV(TAG, "Push Command - GET_MEASUREMENT");
-
-#ifdef USE_PROTOCOL_HEKR
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_MEASUREMENT}});
-#endif
-      break;
-    }
-    case SmCommandType::GET_LIMIT_AND_ENERGY_PURCHASE: {
-      ESP_LOGV(TAG, "Push Command - GET_LIMIT_AND_PURCHASE");
-
-#ifdef USE_PROTOCOL_HEKR
-      this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::GET_LIMIT_AND_ENERGY_PURCHASE}});
-#endif
-      break;
-    }
     case SmCommandType::SET_LIMIT: {
       ESP_LOGD(TAG, "Push Command - SET_LIMIT");
 
+#ifdef USE_PROTOCOL_HEKR
       uint16_t tmp_current_limit = this->data_.max_current_limit * 100;
 
-#ifdef USE_PROTOCOL_HEKR
       std::vector<uint8_t> buffer;
 
       buffer.push_back((uint8_t) CommandData::SET_LIMIT);
@@ -1664,14 +1661,20 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
       buffer.push_back(this->data_.min_voltage_limit & SM_GET_ONE_BYTE);
 
       this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer, .priority_cmd = true});
-#endif
+
       ESP_LOGD(TAG, "* Input Data: max_current_limit = %u, max_voltage_limit = %u, min_voltage_limit = %u", this->data_.max_current_limit, this->data_.max_voltage_limit, this->data_.min_voltage_limit);
+#endif
+
+#ifdef USE_PROTOCOL_TUYA
+      ESP_LOGD(TAG, "* Command not available");
+#endif
 
       break;
     }
     case SmCommandType::SET_ENERGY_PURCHASE: {
       ESP_LOGD(TAG, "Push Command - SET_PURCHASE");
 
+#ifdef USE_PROTOCOL_HEKR
       uint32_t purchase_value = 0;
       uint32_t purchase_alarm = 0;
 
@@ -1680,7 +1683,6 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
         purchase_alarm = this->data_.energy_purchase_alarm * 100;
       }
 
-#ifdef USE_PROTOCOL_HEKR
       std::vector<uint8_t> buffer;
 
       buffer.push_back((uint8_t) CommandData::SET_ENERGY_PURCHASE);
@@ -1698,8 +1700,13 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
       buffer.push_back(state);
 
       this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer, .priority_cmd = true});
-#endif
+
       ESP_LOGD(TAG, "* Input Data: purchase_value = %u, purchase_alarm = %u, state = %s", (state ? this->data_.energy_purchase_value : 0), (state ? this->data_.energy_purchase_alarm : 0), ONOFF(state));
+#endif
+
+#ifdef USE_PROTOCOL_TUYA
+      ESP_LOGD(TAG, "* Command not available");
+#endif
 
       break;
     }
@@ -1714,6 +1721,11 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
 
       this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer, .priority_cmd = true});
 #endif
+
+#ifdef USE_PROTOCOL_TUYA
+      this->set_bool_datapoint_value_(DatapointId::METER_STATE, state, true);
+#endif
+
       ESP_LOGD(TAG, "* Input Data: state = %s", ONOFF(state));
 
       break;
@@ -1721,13 +1733,13 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
     case SmCommandType::SET_DELAY: {
       ESP_LOGD(TAG, "Push Command - SET_DELAY");
 
+#ifdef USE_PROTOCOL_HEKR
       uint16_t delay_value_set = 0;
 
       if (state) {
         delay_value_set = this->data_.delay_value_set;
       }
 
-#ifdef USE_PROTOCOL_HEKR
       std::vector<uint8_t> buffer;
 
       buffer.push_back((uint8_t) CommandData::SET_DELAY);
@@ -1738,8 +1750,13 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
       buffer.push_back(state);
 
       this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = buffer, .priority_cmd = true});
-#endif
+
       ESP_LOGD(TAG, "* Input Data: delay_value_set = %u, state = %s", delay_value_set, ONOFF(state));
+#endif
+
+#ifdef USE_PROTOCOL_TUYA
+      ESP_LOGD(TAG, "* Command not available");
+#endif
 
       break;
     }
@@ -1748,6 +1765,10 @@ void Dxs238xwComponent::send_command_(SmCommandType cmd, bool state) {  // XXXXX
 
 #ifdef USE_PROTOCOL_HEKR
       this->push_command_(SmCommand{.cmd = CommandType::SEND, .payload = std::vector<uint8_t>{(uint8_t) CommandData::SET_RESET}, .priority_cmd = true});
+#endif
+
+#ifdef USE_PROTOCOL_TUYA
+      ESP_LOGD(TAG, "* Command not available");
 #endif
       break;
     }
@@ -2397,16 +2418,7 @@ std::vector<uint8_t> Dxs238xwComponent::base64_decode_(const std::string &encode
        myData.push_back(0x35);
        myData.push_back(0x45);
        myData.push_back(0x55);
-       myData.push_back(0x65);
-       myData.push_back(0xAA);
-       myData.push_back(0xBB);
-       myData.push_back(0xCC);
-       myData.push_back(0xDD);
-       ESP_LOGI(TAG, "* Vector: %s", format_hex_pretty(myData).c_str());
    
        std::string encodedData = this->base64_encode_(&myData[0], myData.size());
-       ESP_LOGI(TAG, "* encodedData: %s", encodedData.c_str());
-   
        std::vector<uint8_t> decodedData = this->base64_decode_(encodedData);
-       ESP_LOGI(TAG, "* decodedData: %s", format_hex_pretty(decodedData).c_str());
    */
