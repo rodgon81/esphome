@@ -160,6 +160,11 @@ def validate_entities(config):
         )
 
     for component in LIST_SENSOR:
+        exist_component = component in fv.full_config.get()
+
+        if not exist_component:
+            continue
+
         platform = fv.full_config.get()[component]
 
         for n in platform:

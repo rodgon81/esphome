@@ -116,15 +116,19 @@ static const char *const TAG = "dxs238xw";
 #define UPDATE_SWITCH_FORCE(name, value)
 #endif
 
-#define LOAD_PREFERENCE(name, preference_string, default_value, factor) \
+#ifdef USE_NUMBER
+#define LOAD_PREFERENCE_(name, preference_string, default_value, factor) \
   if (this->name##_number_ != nullptr) { \
     this->preference_##name##_ = global_preferences->make_preference<uint32_t>(this->hash_##name##_); \
     this->data_.name = this->read_initial_number_value_(this->preference_##name##_, preference_string, default_value) * factor; \
   }
 
-#define LOAD_PREFERENCE_UINT32(name, preference_string, default_value) LOAD_PREFERENCE(name, preference_string, default_value, 1)
-#define LOAD_PREFERENCE_FLOAT(name, preference_string, default_value) LOAD_PREFERENCE(name, preference_string, default_value, 0.1)
-
+#define LOAD_PREFERENCE_UINT32(name, preference_string, default_value) LOAD_PREFERENCE_(name, preference_string, default_value, 1)
+#define LOAD_PREFERENCE_FLOAT(name, preference_string, default_value) LOAD_PREFERENCE_(name, preference_string, default_value, 0.1)
+#else
+#define LOAD_PREFERENCE_UINT32(name, preference_string, default_value)
+#define LOAD_PREFERENCE_FLOAT(name, preference_string, default_value)
+#endif
 //------------------------------------------------------------------------------
 ////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
@@ -669,10 +673,13 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
       UPDATE_TEXT_SENSOR(meter_id, string_serial_number)
 
       if (this->init_state_ == SmInitState::INIT_GET_METER_ID) {
+#ifdef USE_TEXT_SENSOR
         if (this->meter_id_text_sensor_ == nullptr) {
           ESP_LOGD(TAG, "'meter_id': %s", string_serial_number.c_str());
         }
-
+#else
+        ESP_LOGD(TAG, "'meter_id': %s", string_serial_number.c_str());
+#endif
         this->init_state_ = SmInitState::INIT_GET_METER_STATE;
       }
 

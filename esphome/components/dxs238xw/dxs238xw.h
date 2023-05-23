@@ -328,22 +328,6 @@ enum class TuyaDatapointType : uint8_t {
   BITMAP = 0x05,  // 1/2/4 bytes
 };
 
-struct TuyaDatapoint {
-  DatapointId id;
-  TuyaDatapointType type;
-  size_t len;
-
-  union {
-    bool value_bool;
-    uint8_t value_uint8;
-    uint32_t value_uint32;
-    uint32_t value_bitmap;
-  };
-
-  std::string value_string;
-  std::vector<uint8_t> value_raw;
-};
-
 #ifdef USE_MODEL_DDS238_2
 enum class DatapointId : uint8_t {
   //  FREQUENCY = 0,
@@ -437,6 +421,22 @@ enum class DatapointId : uint8_t {
   RESET_DATA = 139,
 };
 #endif
+
+struct TuyaDatapoint {
+  DatapointId id;
+  TuyaDatapointType type;
+  size_t len;
+
+  union {
+    bool value_bool;
+    uint8_t value_uint8;
+    uint32_t value_uint32;
+    uint32_t value_bitmap;
+  };
+
+  std::string value_string;
+  std::vector<uint8_t> value_raw;
+};
 #endif
 
 struct SmCommand {
