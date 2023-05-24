@@ -1828,9 +1828,11 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
   this->error_type_ = SmErrorType::NO_ERROR;
   this->error_code_ = SmErrorCode::NO_ERROR;
 
-  uint8_t length_message = message.length();
+  uint32_t length_message = message.length();
 
   if (length_message == 0 || length_message > SM_MAX_HEX_MSG_LENGTH) {
+    ESP_LOGV(TAG, "* Very long message");
+
     this->error_type_ = SmErrorType::INPUT_DATA;
     this->error_code_ = SmErrorCode::MESSAGE_LENGTH;
   }
@@ -1845,6 +1847,8 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
         if (character_hex_index == 2) {
           character_hex_index = 0;
         } else {
+          ESP_LOGV(TAG, "* The number of hex characters must be 2 characters per byte");
+
           this->error_type_ = SmErrorType::INPUT_DATA;
           this->error_code_ = SmErrorCode::WRONG_MSG;
 
@@ -1852,6 +1856,8 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
         }
       } else {
         if (character_hex_index == 2) {
+          ESP_LOGV(TAG, "* Each hexadecimal value must have two characters and a period that separates them");
+
           this->error_type_ = SmErrorType::INPUT_DATA;
           this->error_code_ = SmErrorCode::WRONG_MSG;
 
@@ -1868,6 +1874,8 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
       uint8_t size_message_without_dots = message_without_dots.size();
 
       if ((size_message_without_dots % 2) != 0) {
+        ESP_LOGV(TAG, "* The number of hex characters must be 2 characters per byte");
+
         this->error_type_ = SmErrorType::INPUT_DATA;
         this->error_code_ = SmErrorCode::WRONG_MSG;
       }
@@ -1877,17 +1885,30 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
       if (this->error_code_ == SmErrorCode::NO_ERROR) {
         std::string str_message_without_dots = std::string(reinterpret_cast<const char *>(ptr_message_without_dots), size_message_without_dots);
 
+        ESP_LOGV(TAG, "* Message without points: %s", str_message_without_dots.c_str());
+
         std::vector<uint8_t> message_hex;
         uint8_t message_hex_size = size_message_without_dots / 2;
 
-        if (!parse_hex(str_message_without_dots, message_hex, message_hex_size) || message_hex_size < SM_MIN_COMMAND_LENGHT) {
+        if (!parse_hex(str_message_without_dots, message_hex, message_hex_size)) {
+          ESP_LOGV(TAG, "* There are characters that are not hexadecimal");
+
+          this->error_type_ = SmErrorType::INPUT_DATA;
+          this->error_code_ = SmErrorCode::WRONG_MSG;
+        } else if (message_hex_size < SM_MIN_COMMAND_LENGHT) {
+          ESP_LOGV(TAG, "* The length of the message does not meet the minimum number of bytes expected");
+
           this->error_type_ = SmErrorType::INPUT_DATA;
           this->error_code_ = SmErrorCode::WRONG_MSG;
         }
 
         if (this->error_code_ == SmErrorCode::NO_ERROR) {
+          ESP_LOGV(TAG, "* Mensaje hex without crc: %s", format_hex_pretty(message_hex).c_str());
+
           if (check_crc) {
             if (this->calculate_crc_(message_hex.data(), message_hex_size - 1) != message_hex[message_hex_size - 1]) {
+              ESP_LOGV(TAG, "* Crc is incorrect");
+
               this->error_type_ = SmErrorType::INPUT_DATA;
               this->error_code_ = SmErrorCode::CRC;
             }
@@ -1911,35 +1932,46 @@ void Dxs238xwComponent::hex_message(std::string message, bool check_crc) {
               message_hex.pop_back();
 
               this->push_command_(SmCommand{.cmd = command, .payload = message_hex, .raw = true, .priority_cmd = true});
+
+              return;
             }
 #endif
 
 #ifdef USE_PROTOCOL_TUYA
             uint16_t length = (uint16_t(message_hex[4]) << 8) | (uint16_t(message_hex[5]));
 
+            ESP_LOGV(TAG, "* Message length: %u", length);
+
             if (message_hex[0] != TUYA_HEADER_1 || message_hex[1] != TUYA_HEADER_2) {
+              ESP_LOGV(TAG, "* Header error");
+
               this->error_type_ = SmErrorType::INPUT_DATA;
               this->error_code_ = SmErrorCode::WRONG_BYTES_HEADER;
             } else if (message_hex[2] != 0x00) {
+              ESP_LOGV(TAG, "* Message version error");
+
               this->error_type_ = SmErrorType::INPUT_DATA;
               this->error_code_ = SmErrorCode::WRONG_BYTES_VERSION_PROTOCOL;
-            } else if (length != message_hex_size) {
-              this->error_type_ = SmErrorType::INPUT_DATA;
-              this->error_code_ = SmErrorCode::WRONG_BYTES_LENGTH;
             } else {
               CommandType command = (CommandType) message_hex[3];
+              ESP_LOGV(TAG, "* Command to send %u", command);
 
               if (message_hex_size == SM_MIN_COMMAND_LENGHT) {
+                ESP_LOGD(TAG, "* Command without payload");
+
                 this->push_command_(SmCommand{.cmd = command, .raw = true, .priority_cmd = true});
               } else {
                 message_hex.erase(message_hex.begin(), message_hex.begin() + 6);
                 message_hex.pop_back();
 
+                ESP_LOGD(TAG, "* Command with payload: %s", format_hex_pretty(message_hex).c_str());
+
                 this->push_command_(SmCommand{.cmd = command, .payload = message_hex, .raw = true, .priority_cmd = true});
               }
+
+              return;
             }
 #endif
-            return;
           }
         }
       }

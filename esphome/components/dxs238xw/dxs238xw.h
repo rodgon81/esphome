@@ -27,7 +27,7 @@ namespace dxs238xw {
 
 //*************************************************************************************
 
-static const char *const SM_STR_COMPONENT_VERSION = "2.0.0001 beta";
+static const char *const SM_STR_COMPONENT_VERSION = "2.0.0002 beta";
 
 //*************************************************************************************
 
@@ -94,7 +94,7 @@ static const uint8_t SM_MAX_MILLIS_TO_RX_BYTE = 50;
 
 static const uint8_t SM_COMMAND_DELAY = 50;
 
-static const uint8_t SM_MAX_HEX_MSG_LENGTH = 255;
+static const uint32_t SM_MAX_HEX_MSG_LENGTH = 256;
 
 static const uint8_t SM_GET_ONE_BYTE = 0xFF;
 
