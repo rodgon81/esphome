@@ -66,7 +66,7 @@ This development works with the meters that work with the WISEN app. If your met
         total_energy_price:
           name: "Total Energy Price"
         contract_total_energy:
-          name: "Total Energy Contract"
+          name: "External Meter Total Energy"
 
         price_kWh:
           name: "kWh Price"
@@ -105,7 +105,7 @@ This development works with the meters that work with the WISEN app. If your met
         delay_value_set:
           name: "Delay Time"
         starting_kWh:
-          name: "kWh Start"
+          name: "kWh Start - External Meter"
         price_kWh:
           name: "kWh Price"
 
@@ -121,7 +121,7 @@ This development works with the meters that work with the WISEN app. If your met
     button:
       - platform: dxs238xw
         reset_data:
-          name: "Restart Consumption"
+          name: "Reset Energy Consumption"
 
     binary_sensor:
       - platform: gpio

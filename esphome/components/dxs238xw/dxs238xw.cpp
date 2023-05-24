@@ -451,7 +451,7 @@ bool Dxs238xwComponent::validate_message_() {
     return false;
   }
 
-  if (!this->is_expected_message() || this->command_queue_.front().raw) {
+  if (!this->is_expected_message() || this->command_queue_.front().raw || this->get_component_state() == COMPONENT_STATE_SETUP) {
     ESP_LOGI(TAG, "* Incoming message: %s", format_hex_pretty(this->rx_message_).c_str());
   }
 
@@ -901,8 +901,6 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
     }
   }
 
-  ESP_LOGI(TAG, "Process Command (0x%02X)", command);
-
   switch (command_type) {
     case CommandType::HEARTBEAT: {
       ESP_LOGV(TAG, "MCU Heartbeat (0x%02X)", buffer[0]);
@@ -928,6 +926,8 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       break;
     }
     case CommandType::PRODUCT_QUERY: {
+      ESP_LOGD(TAG, "Process Command PRODUCT_QUERY");
+
       bool valid = true;
 
       for (size_t i = 0; i < len; i++) {
@@ -950,6 +950,8 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       break;
     }
     case CommandType::WORKING_MODE_QUERY: {
+      ESP_LOGD(TAG, "Process Command WORKING_MODE_QUERY");
+
       if (len >= 2) {
         this->status_pin_reported_ = buffer[0];
         this->reset_pin_reported_ = buffer[1];
@@ -966,6 +968,8 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       break;
     }
     case CommandType::WIFI_STATE: {
+      ESP_LOGD(TAG, "Process Command WIFI_STATE");
+
       if (this->init_state_ == SmInitState::INIT_WIFI_STATE) {
         this->init_state_ = SmInitState::INIT_DATAPOINT_QUERY;
       }
@@ -978,16 +982,22 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       break;
     }
     case CommandType::WIFI_TEST: {
+      ESP_LOGD(TAG, "Process Command WIFI_TEST");
+
       this->push_command_(SmCommand{.cmd = CommandType::WIFI_TEST, .payload = std::vector<uint8_t>{0x00, 0x00}});
 
       break;
     }
     case CommandType::WIFI_RSSI: {
+      ESP_LOGD(TAG, "Process Command WIFI_RSSI");
+
       this->push_command_(SmCommand{.cmd = CommandType::WIFI_RSSI, .payload = std::vector<uint8_t>{0xEC}});
 
       break;
     }
     case CommandType::LOCAL_TIME_QUERY: {
+      ESP_LOGD(TAG, "Process Command LOCAL_TIME_QUERY");
+
 #ifdef USE_TIME
       if (this->time_id_.has_value()) {
         this->send_local_time_();
@@ -1004,6 +1014,8 @@ void Dxs238xwComponent::handle_command_(uint8_t command, uint8_t version, const 
       break;
     }
     case CommandType::GET_NETWORK_STATUS: {
+      ESP_LOGD(TAG, "Process Command GET_NETWORK_STATUS");
+
       this->push_command_(SmCommand{.cmd = CommandType::GET_NETWORK_STATUS, .payload = std::vector<uint8_t>{0x04}});
 
       break;
@@ -1035,27 +1047,35 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
 
     datapoint.len = data_size;
 
+    len -= data_size + 4;
+    buffer = data + data_size;
+
     switch (datapoint.type) {
       case TuyaDatapointType::RAW:
         datapoint.value_raw = std::vector<uint8_t>(data, data + data_size);
+
         ESP_LOGD(TAG, "Datapoint %u update to %s", datapoint.id, format_hex_pretty(datapoint.value_raw).c_str());
 
         break;
       case TuyaDatapointType::BOOL:
         if (data_size != 1) {
           ESP_LOGW(TAG, "Datapoint %u has bad bool len %zu", datapoint.id, data_size);
-          return;
+
+          continue;
         }
 
         datapoint.value_bool = data[0];
-        ESP_LOGD(TAG, "Datapoint %u update to %s", datapoint.id, ONOFF(datapoint.value_bool));
+
+        ESP_LOGD(TAG, "Datapoint %u update to %s", datapoint.id, TRUEFALSE(datapoint.value_bool));
 
         break;
       case TuyaDatapointType::UINT8:
         if (data_size != 1) {
           ESP_LOGW(TAG, "Datapoint %u has bad uint8 len %zu", datapoint.id, data_size);
-          return;
+
+          continue;
         }
+
         datapoint.value_uint8 = data[0];
 
         ESP_LOGD(TAG, "Datapoint %u update to %d", datapoint.id, datapoint.value_uint8);
@@ -1064,7 +1084,8 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
       case TuyaDatapointType::UINT32:
         if (data_size != 4) {
           ESP_LOGW(TAG, "Datapoint %u has bad uint32 len %zu", datapoint.id, data_size);
-          return;
+
+          continue;
         }
 
         datapoint.value_uint32 = encode_uint32(data[0], data[1], data[2], data[3]);
@@ -1074,6 +1095,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
         break;
       case TuyaDatapointType::STRING:
         datapoint.value_string = std::string(reinterpret_cast<const char *>(data), data_size);
+
         ESP_LOGD(TAG, "Datapoint %u update to %s", datapoint.id, datapoint.value_string.c_str());
 
         break;
@@ -1090,7 +1112,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
             break;
           default:
             ESP_LOGW(TAG, "Datapoint %u has bad bitmask len %zu", datapoint.id, data_size);
-            return;
+            continue;
         }
 
         ESP_LOGD(TAG, "Datapoint %u update to %#08X", datapoint.id, datapoint.value_bitmap);
@@ -1099,19 +1121,16 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
       default:
         ESP_LOGW(TAG, "Datapoint %u has unknown type %#02hhX", datapoint.id, static_cast<uint8_t>(datapoint.type));
 
-        return;
+        continue;
     }
 
-    len -= data_size + 4;
-    buffer = data + data_size;
-
-    // Update internal datapoints
     bool found = false;
 
     for (auto &other : this->datapoints_) {
       if (other.id == datapoint.id) {
         other = datapoint;
         found = true;
+        break;
       }
     }
 
@@ -1181,9 +1200,7 @@ void Dxs238xwComponent::process_and_update_data_(const uint8_t *buffer, size_t l
 #ifdef USE_MODEL_DTS238_7
 #endif
       default:
-        ESP_LOGW(TAG, "Datapoint %u has not proseced", datapoint.id);
-
-        return;
+        ESP_LOGW(TAG, "Datapoint %u has not processed", datapoint.id);
     }
   }
 

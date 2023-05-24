@@ -27,7 +27,7 @@ namespace dxs238xw {
 
 //*************************************************************************************
 
-static const char *const SM_STR_COMPONENT_VERSION = "2.0.0000 beta";
+static const char *const SM_STR_COMPONENT_VERSION = "2.0.0001 beta";
 
 //*************************************************************************************
 
@@ -339,7 +339,7 @@ enum class DatapointId : uint8_t {
   ACTIVE_POWER = 19,
 
   IMPORT_ACTIVE_ENERGY = 101,
-  EXPORT_ACTIVE_ENERGY = 9,
+  EXPORT_ACTIVE_ENERGY = 9,  /////????
   //  TOTAL_ENERGY = 0,
 
   // ENERGY_PURCHASE_ALARM = 0,
@@ -352,8 +352,8 @@ enum class DatapointId : uint8_t {
   METER_STATE = 1,
   //  SET_DELAY = 0,
   //  SET_RESET_DATA = 0,
-  GET_CONFIG = 17,
-  GET_DATA = 6,
+  GET_CONFIG = 17,  /////????
+  GET_DATA = 6,     /////????
 };
 #endif
 
