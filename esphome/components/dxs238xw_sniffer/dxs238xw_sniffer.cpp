@@ -29,15 +29,15 @@ void Dxs238xwSnifferComponent::setup() {
 
       break;
     case SmInitState::INIT_DONE:
-      ESP_LOGI(TAG, "Print '%s' Messages offline mode", SM_STR_PROTOCOL);
+      ESP_LOGI(TAG, "Print '%s' Messages offline mode:", SM_STR_PROTOCOL);
 
       for (auto &message : this->incoming_messages_offline_) {
         ESP_LOGI(TAG, "* %s message: %s", SM_STR_MODE, format_hex_pretty(message.payload).c_str());
       }
 
-      this->incoming_messages_offline_.clear();
+      // this->incoming_messages_offline_.clear();
 
-      ESP_LOGI(TAG, "Print '%s' Messages online mode", SM_STR_PROTOCOL);
+      ESP_LOGI(TAG, "Print '%s' Messages online mode:", SM_STR_PROTOCOL);
 
       break;
     default:
@@ -60,6 +60,14 @@ void Dxs238xwSnifferComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Component Version: %s", SM_STR_COMPONENT_VERSION);
   ESP_LOGCONFIG(TAG, "  Protocol: %s", SM_STR_PROTOCOL);
   ESP_LOGCONFIG(TAG, "  Mode: %s", SM_STR_MODE);
+
+  if (!this->incoming_messages_offline_.empty()) {
+    ESP_LOGCONFIG(TAG, "  Print '%s' Messages offline mode:", SM_STR_PROTOCOL);
+
+    for (auto &message : this->incoming_messages_offline_) {
+      ESP_LOGCONFIG(TAG, "  * %s message: %s", SM_STR_MODE, format_hex_pretty(message.payload).c_str());
+    }
+  }
 }
 
 void Dxs238xwSnifferComponent::incoming_messages_() {
