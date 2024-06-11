@@ -1,9 +1,9 @@
 #pragma once
 
-#include "esphome/core/component.h"
-#include "esphome/core/helpers.h"
 #include "esphome/core/automation.h"
+#include "esphome/core/component.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/helpers.h"
 
 #ifdef USE_ESP32
 #include <esp_sleep.h>
@@ -11,7 +11,10 @@
 
 #ifdef USE_TIME
 #include "esphome/components/time/real_time_clock.h"
+#include "esphome/core/time.h"
 #endif
+
+#include <cinttypes>
 
 namespace esphome {
 namespace deep_sleep {
@@ -103,6 +106,10 @@ class DeepSleepComponent : public Component {
   // duration before entering deep sleep.
   optional<uint32_t> get_run_duration_() const;
 
+  void dump_config_platform_();
+  bool prepare_to_sleep_();
+  void deep_sleep_();
+
   optional<uint64_t> sleep_duration_;
 #ifdef USE_ESP32
   InternalGPIOPin *wakeup_pin_;
@@ -170,7 +177,7 @@ template<typename... Ts> class EnterDeepSleepAction : public Action<Ts...> {
       if (after_time)
         timestamp += 60 * 60 * 24;
 
-      int32_t offset = time::ESPTime::timezone_offset();
+      int32_t offset = ESPTime::timezone_offset();
       timestamp -= offset;  // Change timestamp to utc
       const uint32_t ms_left = (timestamp - timestamp_now) * 1000;
       this->deep_sleep_->set_sleep_duration(ms_left);
