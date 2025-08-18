@@ -1,4 +1,5 @@
 #include "wake_on_lan.h"
+#ifdef USE_NETWORK
 #include "esphome/core/log.h"
 #include "esphome/components/network/ip_address.h"
 #include "esphome/components/network/util.h"
@@ -29,7 +30,7 @@ void WakeOnLanButton::press_action() {
     ESP_LOGW(TAG, "Network not connected");
     return;
   }
-  ESP_LOGI(TAG, "Sending Wake-on-LAN Packet...");
+  ESP_LOGI(TAG, "Sending Wake-on-LAN Packet");
 #if defined(USE_SOCKET_IMPL_BSD_SOCKETS) || defined(USE_SOCKET_IMPL_LWIP_SOCKETS)
   struct sockaddr_storage saddr {};
   auto addr_len =
@@ -85,3 +86,4 @@ void WakeOnLanButton::setup() {
 
 }  // namespace wake_on_lan
 }  // namespace esphome
+#endif

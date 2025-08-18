@@ -1,26 +1,18 @@
 import logging
 
 from esphome.const import (
-    CONF_DISABLED_BY_DEFAULT,
-    CONF_ENTITY_CATEGORY,
-    CONF_ICON,
-    CONF_INTERNAL,
-    CONF_NAME,
     CONF_SAFE_MODE,
     CONF_SETUP_PRIORITY,
     CONF_TYPE_ID,
     CONF_UPDATE_INTERVAL,
     KEY_PAST_SAFE_MODE,
 )
-
-from esphome.core import coroutine, ID, CORE
+from esphome.core import CORE, ID, coroutine
 from esphome.coroutine import FakeAwaitable
-from esphome.types import ConfigType, ConfigFragmentType
 from esphome.cpp_generator import add, get_variable
 from esphome.cpp_types import App
+from esphome.types import ConfigFragmentType, ConfigType
 from esphome.util import Registry, RegistryEntry
-from esphome.helpers import snake_case, sanitize
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,22 +90,6 @@ async def register_parented(var, value):
     add(var.set_parent(paren))
 
 
-async def setup_entity(var, config):
-    """Set up generic properties of an Entity"""
-    add(var.set_name(config[CONF_NAME]))
-    if not config[CONF_NAME]:
-        add(var.set_object_id(sanitize(snake_case(CORE.friendly_name))))
-    else:
-        add(var.set_object_id(sanitize(snake_case(config[CONF_NAME]))))
-    add(var.set_disabled_by_default(config[CONF_DISABLED_BY_DEFAULT]))
-    if CONF_INTERNAL in config:
-        add(var.set_internal(config[CONF_INTERNAL]))
-    if CONF_ICON in config:
-        add(var.set_icon(config[CONF_ICON]))
-    if CONF_ENTITY_CATEGORY in config:
-        add(var.set_entity_category(config[CONF_ENTITY_CATEGORY]))
-
-
 def extract_registry_entry_config(
     registry: Registry,
     full_config: ConfigType,
@@ -139,7 +115,7 @@ async def build_registry_list(registry, config):
 
 async def past_safe_mode():
     if CONF_SAFE_MODE not in CORE.config:
-        return
+        return None
 
     def _safe_mode_generator():
         while True:

@@ -1,11 +1,9 @@
 #pragma once
 
+#include "esphome/components/display/display_buffer.h"
+#include "esphome/components/i2c/i2c.h"
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
-#include "esphome/components/i2c/i2c.h"
-#include "esphome/components/display/display_buffer.h"
-
-#ifdef USE_ESP32_FRAMEWORK_ARDUINO
 
 namespace esphome {
 namespace inkplate6 {
@@ -15,6 +13,8 @@ enum InkplateModel : uint8_t {
   INKPLATE_10 = 1,
   INKPLATE_6_PLUS = 2,
   INKPLATE_6_V2 = 3,
+  INKPLATE_5 = 4,
+  INKPLATE_5_V2 = 5,
 };
 
 class Inkplate6 : public display::DisplayBuffer, public i2c::I2CDevice {
@@ -29,7 +29,7 @@ class Inkplate6 : public display::DisplayBuffer, public i2c::I2CDevice {
   const uint8_t pixelMaskLUT[8] = {0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80};
   const uint8_t pixelMaskGLUT[2] = {0x0F, 0xF0};
 
-  const uint8_t waveform3BitAll[4][8][9] = {// INKPLATE_6
+  const uint8_t waveform3BitAll[6][8][9] = {// INKPLATE_6
                                             {{0, 1, 1, 0, 0, 1, 1, 0, 0},
                                              {0, 1, 2, 1, 1, 2, 1, 0, 0},
                                              {1, 1, 1, 2, 2, 1, 0, 0, 0},
@@ -64,7 +64,25 @@ class Inkplate6 : public display::DisplayBuffer, public i2c::I2CDevice {
                                              {1, 1, 1, 1, 2, 2, 1, 0, 0},
                                              {0, 1, 1, 1, 2, 2, 1, 0, 0},
                                              {0, 0, 0, 0, 1, 1, 2, 0, 0},
-                                             {0, 0, 0, 0, 0, 1, 2, 0, 0}}};
+                                             {0, 0, 0, 0, 0, 1, 2, 0, 0}},
+                                            // INKPLATE_5
+                                            {{0, 0, 1, 1, 0, 1, 1, 1, 0},
+                                             {0, 1, 1, 1, 1, 2, 0, 1, 0},
+                                             {1, 2, 2, 0, 2, 1, 1, 1, 0},
+                                             {1, 1, 1, 2, 0, 1, 1, 2, 0},
+                                             {0, 1, 1, 1, 2, 0, 1, 2, 0},
+                                             {0, 0, 0, 1, 1, 2, 1, 2, 0},
+                                             {1, 1, 1, 2, 0, 2, 1, 2, 0},
+                                             {0, 0, 0, 0, 0, 0, 0, 0, 0}},
+                                            // INKPLATE_5_V2
+                                            {{0, 0, 1, 1, 2, 1, 1, 1, 0},
+                                             {1, 1, 2, 2, 1, 2, 1, 1, 0},
+                                             {0, 1, 2, 2, 1, 1, 2, 1, 0},
+                                             {0, 0, 1, 1, 1, 1, 1, 2, 0},
+                                             {1, 2, 1, 2, 1, 1, 1, 2, 0},
+                                             {0, 1, 1, 1, 2, 0, 1, 2, 0},
+                                             {1, 1, 1, 2, 2, 2, 1, 2, 0},
+                                             {0, 0, 0, 0, 0, 0, 0, 0, 0}}};
 
   void set_greyscale(bool greyscale) {
     this->greyscale_ = greyscale;
@@ -72,6 +90,9 @@ class Inkplate6 : public display::DisplayBuffer, public i2c::I2CDevice {
     if (this->is_ready())
       this->initialize_();
   }
+  void set_mirror_y(bool mirror_y) { this->mirror_y_ = mirror_y; }
+  void set_mirror_x(bool mirror_x) { this->mirror_x_ = mirror_x; }
+
   void set_partial_updating(bool partial_updating) { this->partial_updating_ = partial_updating; }
   void set_full_update_every(uint32_t full_update_every) { this->full_update_every_ = full_update_every; }
 
@@ -146,6 +167,10 @@ class Inkplate6 : public display::DisplayBuffer, public i2c::I2CDevice {
       return 800;
     } else if (this->model_ == INKPLATE_10) {
       return 1200;
+    } else if (this->model_ == INKPLATE_5) {
+      return 960;
+    } else if (this->model_ == INKPLATE_5_V2) {
+      return 1280;
     } else if (this->model_ == INKPLATE_6_PLUS) {
       return 1024;
     }
@@ -155,6 +180,10 @@ class Inkplate6 : public display::DisplayBuffer, public i2c::I2CDevice {
   int get_height_internal() override {
     if (this->model_ == INKPLATE_6 || this->model_ == INKPLATE_6_V2) {
       return 600;
+    } else if (this->model_ == INKPLATE_5) {
+      return 540;
+    } else if (this->model_ == INKPLATE_5_V2) {
+      return 720;
     } else if (this->model_ == INKPLATE_10) {
       return 825;
     } else if (this->model_ == INKPLATE_6_PLUS) {
@@ -193,6 +222,8 @@ class Inkplate6 : public display::DisplayBuffer, public i2c::I2CDevice {
 
   bool block_partial_{true};
   bool greyscale_;
+  bool mirror_y_{false};
+  bool mirror_x_{false};
   bool partial_updating_;
 
   InkplateModel model_;
@@ -221,5 +252,3 @@ class Inkplate6 : public display::DisplayBuffer, public i2c::I2CDevice {
 
 }  // namespace inkplate6
 }  // namespace esphome
-
-#endif  // USE_ESP32_FRAMEWORK_ARDUINO
