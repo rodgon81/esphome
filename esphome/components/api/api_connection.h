@@ -44,7 +44,7 @@ static constexpr size_t MAX_PACKETS_PER_BATCH = 64;  // ESP32 has 8KB+ stack, HO
 static constexpr size_t MAX_PACKETS_PER_BATCH = 32;  // ESP8266/RP2040/etc have smaller stacks
 #endif
 
-class APIConnection : public APIServerConnection {
+class APIConnection final : public APIServerConnection {
  public:
   friend class APIServer;
   friend class ListEntitiesIterator;
@@ -171,6 +171,11 @@ class APIConnection : public APIServerConnection {
   void voice_assistant_set_configuration(const VoiceAssistantSetConfiguration &msg) override;
 #endif
 
+#ifdef USE_ZWAVE_PROXY
+  void zwave_proxy_frame(const ZWaveProxyFrame &msg) override;
+  void zwave_proxy_request(const ZWaveProxyRequest &msg) override;
+#endif
+
 #ifdef USE_ALARM_CONTROL_PANEL
   bool send_alarm_control_panel_state(alarm_control_panel::AlarmControlPanel *a_alarm_control_panel);
   void alarm_control_panel_command(const AlarmControlPanelCommandRequest &msg) override;
@@ -197,7 +202,9 @@ class APIConnection : public APIServerConnection {
   void on_get_time_response(const GetTimeResponse &value) override;
 #endif
   bool send_hello_response(const HelloRequest &msg) override;
-  bool send_connect_response(const ConnectRequest &msg) override;
+#ifdef USE_API_PASSWORD
+  bool send_authenticate_response(const AuthenticationRequest &msg) override;
+#endif
   bool send_disconnect_response(const DisconnectRequest &msg) override;
   bool send_ping_response(const PingRequest &msg) override;
   bool send_device_info_response(const DeviceInfoRequest &msg) override;
@@ -219,7 +226,6 @@ class APIConnection : public APIServerConnection {
 #ifdef USE_API_HOMEASSISTANT_STATES
   void subscribe_home_assistant_states(const SubscribeHomeAssistantStatesRequest &msg) override;
 #endif
-  bool send_get_time_response(const GetTimeRequest &msg) override;
 #ifdef USE_API_SERVICES
   void execute_service(const ExecuteServiceRequest &msg) override;
 #endif
@@ -301,9 +307,17 @@ class APIConnection : public APIServerConnection {
                                               APIConnection *conn, uint32_t remaining_size, bool is_single) {
     // Set common fields that are shared by all entity types
     msg.key = entity->get_object_id_hash();
-    // IMPORTANT: get_object_id() may return a temporary std::string
-    std::string object_id = entity->get_object_id();
-    msg.set_object_id(StringRef(object_id));
+    // Try to use static reference first to avoid allocation
+    StringRef static_ref = entity->get_object_id_ref_for_api_();
+    // Store dynamic string outside the if-else to maintain lifetime
+    std::string object_id;
+    if (!static_ref.empty()) {
+      msg.set_object_id(static_ref);
+    } else {
+      // Dynamic case - need to allocate
+      object_id = entity->get_object_id();
+      msg.set_object_id(StringRef(object_id));
+    }
 
     if (entity->has_own_name()) {
       msg.set_name(entity->get_name());
@@ -724,7 +738,7 @@ class APIConnection : public APIServerConnection {
   }
 
   // Helper function to log API errors with errno
-  void log_warning_(const char *message, APIError err);
+  void log_warning_(const LogString *message, APIError err);
   // Specific helper for duplicated error message
   void log_socket_operation_failed_(APIError err);
 };
