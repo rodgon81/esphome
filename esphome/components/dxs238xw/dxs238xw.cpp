@@ -318,7 +318,7 @@ void Dxs238xwComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  Component Version: %s", SM_STR_COMPONENT_VERSION);
   ESP_LOGCONFIG(TAG, "  Meter Model: %s", SM_STR_METER_MODEL);
   ESP_LOGCONFIG(TAG, "  Protocol: %s", SM_STR_PROTOCOL);
-  LOG_UPDATE_INTERVAL(this)
+  LOG_UPDATE_INTERVAL(this);
 }
 
 //------------------------------------------------------------------------------
